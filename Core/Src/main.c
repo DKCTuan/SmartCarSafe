@@ -21,20 +21,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "car_actuator.h"      /* Phần của Minh Trọng*/
-#include "radar_exti.h"        /* Phần của Đức Trọng*/
-#include "bme280_lcd_i2c.h"    /* Phần của Công Trường*/
-#include "sound_adc.h"         /* Phần cảm biến âm thanh của Tuấn*/
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef enum {
-    STATE_IDLE,
-    STATE_ARMING,
-    STATE_SCANNING,
-    STATE_ALARM
-} SystemState;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -51,7 +43,7 @@ typedef enum {
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-static volatile uint32_t ms_ticks = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,83 +87,22 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
+  /* Initialize all configured peripherals */
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  /* Cau hinh SysTick ngat moi 1ms voi xung nhip he thong 84 MHz */
-    SysTick->LOAD = 83999U;
-    SysTick->VAL  = 0U;
-    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |
-                    SysTick_CTRL_TICKINT_Msk   |
-                    SysTick_CTRL_ENABLE_Msk;
-
-    /* Khoi tao trang thai ban dau cua may */
-    SystemState current_state = STATE_IDLE;
-    uint32_t state_timer = 0;
-    float current_temperature = 25.0f; /* Gia tri gia dinh ban dau */
   /* USER CODE END 2 */
 
   /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-      while (1)
-      {
-          /* --- DOC DU LIEU LIEN TUC (Non-blocking) --- */
-          current_temperature = BME280_Read_Temperature();
-          Sound_Process_Sample();
+    while (1)
+    {
+      /* USER CODE END WHILE */
 
-          /* --- LOI DIEU PHOI MAY TRANG THAI --- */
-          switch (current_state)
-          {
-              case STATE_IDLE:
-                  if (Car_Get_ACC_Status() == 0 && Car_Get_Lock_Status() == 1) {
-                      current_state = STATE_ARMING;
-                      state_timer = ms_ticks;
-                  }
-                  Actuator_Set_Fan_Speed(0);
-                  Actuator_Set_Window_Position(0);
-                  break;
-
-              case STATE_ARMING:
-                  if (ms_ticks - state_timer >= 30000) {
-                      current_state = STATE_SCANNING;
-                  }
-                  if (Car_Get_Lock_Status() == 0) {
-                      current_state = STATE_IDLE;
-                  }
-                  break;
-
-              case STATE_SCANNING:
-                  if (Radar_Is_Detected() == 1 || Sound_Is_Detected() == 1) {
-                      current_state = STATE_ALARM;
-                  }
-                  if (Car_Get_Lock_Status() == 0) {
-                      current_state = STATE_IDLE;
-                  }
-                  break;
-
-              case STATE_ALARM:
-                  if (current_temperature > 42.0f) {
-                      Actuator_Set_Fan_Speed(2);
-                      Actuator_Set_Window_Position(90);
-                  } else if (current_temperature > 32.0f) {
-                      Actuator_Set_Fan_Speed(1);
-                      Actuator_Set_Window_Position(0);
-                  }
-                  if (Car_Get_Lock_Status() == 0) {
-                      current_state = STATE_IDLE;
-                  }
-                  break;
-          }
-
-          /* Lien tuc cap nhat trang thai ra man hinh hien thi tai cho */
-          LCD_Display_Status(current_state, current_temperature);
-      }
-        /* USER CODE END WHILE */
-  /* USER CODE BEGIN 3 */
-
-  /* USER CODE END 3 */
+      /* USER CODE BEGIN 3 */
+    }
+    /* USER CODE END 3 */
 }
-
 /**
   * @brief System Clock Configuration
   * @retval None
