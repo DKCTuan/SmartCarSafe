@@ -34,7 +34,7 @@ typedef enum {
     STATE_ARMING,
     STATE_SCANNING,
     STATE_ALARM
-}
+} SystemState;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -112,73 +112,63 @@ int main(void)
   /* USER CODE END 2 */
 
   /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-	  while (1)
-	    {
-	      /* --- DOC DU LIEU LIEN TUC (Non-blocking) --- */
-	      current_temperature = BME280_Read_Temperature(); /* Phan cua Truong */
-	      Sound_Process_Sample();                          /* Phan cam bien am thanh cua Tuan */
+    /* USER CODE BEGIN WHILE */
+      while (1)
+      {
+          /* --- DOC DU LIEU LIEN TUC (Non-blocking) --- */
+          current_temperature = BME280_Read_Temperature();
+          Sound_Process_Sample();
 
-	      /* --- LOI DIEU PHOI MAY TRANG THAI --- */
-	      switch (current_state)
-	      {
-	          case STATE_IDLE:
-	              /* Tuan hoi module cua Minh Trong xem trang thai cac cong tac xe the nao */
-	              if (Car_Get_ACC_Status() == 0 && Car_Get_Lock_Status() == 1) {
-	                  current_state = STATE_ARMING;
-	                  state_timer = ms_ticks; /* Luu lai moc thoi gian bat dau dem nguoc */
-	              }
-	              /* Trang thai an toan: Tat het coi, quat, giu nguyen kinh */
-	              Actuator_Set_Fan_Speed(0);
-	              Actuator_Set_Window_Position(0);
-	              break;
+          /* --- LOI DIEU PHOI MAY TRANG THAI --- */
+          switch (current_state)
+          {
+              case STATE_IDLE:
+                  if (Car_Get_ACC_Status() == 0 && Car_Get_Lock_Status() == 1) {
+                      current_state = STATE_ARMING;
+                      state_timer = ms_ticks;
+                  }
+                  Actuator_Set_Fan_Speed(0);
+                  Actuator_Set_Window_Position(0);
+                  break;
 
-	          case STATE_ARMING:
-	              /* Dem nguoc 30 giay (30000 ms) bang SysTick de cho nguoi dung roi xe hoan toan */
-	              if (ms_ticks - state_timer >= 30000) {
-	                  current_state = STATE_SCANNING;
-	              }
-	              /* Neu nguoi dung bat ngo quay lai mo khoa xe -> Tro ve trang thai IDLE */
-	              if (Car_Get_Lock_Status() == 0) {
-	                  current_state = STATE_IDLE;
-	              }
-	              break;
+              case STATE_ARMING:
+                  if (ms_ticks - state_timer >= 30000) {
+                      current_state = STATE_SCANNING;
+                  }
+                  if (Car_Get_Lock_Status() == 0) {
+                      current_state = STATE_IDLE;
+                  }
+                  break;
 
-	          case STATE_SCANNING:
-	              /* Ket hop tin hieu tu bo loc Radar (Duc Trong) va bo loc Am thanh (Tuan) */
-	              if (Radar_Is_Detected() == 1 || Sound_Is_Detected() == 1) {
-	                  current_state = STATE_ALARM;
-	              }
-	              /* Neu xe duoc mo khoa hop phap -> Tro ve IDLE */
-	              if (Car_Get_Lock_Status() == 0) {
-	                  current_state = STATE_IDLE;
-	              }
-	              break;
+              case STATE_SCANNING:
+                  if (Radar_Is_Detected() == 1 || Sound_Is_Detected() == 1) {
+                      current_state = STATE_ALARM;
+                  }
+                  if (Car_Get_Lock_Status() == 0) {
+                      current_state = STATE_IDLE;
+                  }
+                  break;
 
-	          case STATE_ALARM:
-	              /* Cuu ho da cap dua tren nhiet do cabin do tu BME280 */
-	              if (current_temperature > 42.0f) {
-	                  Actuator_Set_Fan_Speed(2);       /* Quat chay nhanh toi da */
-	                  Actuator_Set_Window_Position(90); /* Servo quay mo kinh xe */
-	              } else if (current_temperature > 32.0f) {
-	                  Actuator_Set_Fan_Speed(1);       /* Bat quạt thong gio muc vua */
-	                  Actuator_Set_Window_Position(0);  /* Kinh van dong */
-	              }
+              case STATE_ALARM:
+                  if (current_temperature > 42.0f) {
+                      Actuator_Set_Fan_Speed(2);
+                      Actuator_Set_Window_Position(90);
+                  } else if (current_temperature > 32.0f) {
+                      Actuator_Set_Fan_Speed(1);
+                      Actuator_Set_Window_Position(0);
+                  }
+                  if (Car_Get_Lock_Status() == 0) {
+                      current_state = STATE_IDLE;
+                  }
+                  break;
+          }
 
-	              /* Neu giai cuu thanh cong, chu xe bam nut mo chot cua -> Giai tru bao dong */
-	              if (Car_Get_Lock_Status() == 0) {
-	                  current_state = STATE_IDLE;
-	              }
-	              break;
-	      }
+          /* Lien tuc cap nhat trang thai ra man hinh hien thi tai cho */
+          LCD_Display_Status(current_state, current_temperature);
+      }
+        /* USER CODE END WHILE */
+  /* USER CODE BEGIN 3 */
 
-	      /* Lien tuc cap nhat trang thai ra man hinh hien thi tai cho (Phan cua Truong) */
-	      LCD_Display_Status(current_state, current_temperature);
-    /* USER CODE BEGIN 3 */
-  }
   /* USER CODE END 3 */
 }
 
@@ -299,10 +289,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void SysTick_Handler(void)
-{
-    ms_ticks++;
-}
+
 /* USER CODE END 4 */
 
 /**
