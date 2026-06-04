@@ -1,4 +1,4 @@
-#include "sound_adc.h"
+#include <dev_sound_analog.h>
 
 
 void Sound_ADC_Init(void)
