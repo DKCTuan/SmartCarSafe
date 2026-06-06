@@ -1,24 +1,31 @@
 /*
  * car_actuator.h
  *
- *  Created on: Jun 3, 2026
- *      Author: DINH KIEU CONG TUAN
+ *
  */
 
 #ifndef CAR_ACTUATOR_H
 #define CAR_ACTUATOR_H
 
 #include "stm32f4xx.h"
+#include <stdint.h>
 
-/* Hàm khởi tạo GPIO Input cho công tắc và Timer PWM cho Servo/Quạt */
+/* Định nghĩa chân đầu ra (PWM cho quạt & servo) */
+#define PWM_PORT            GPIOA
+/* PA6 (TIM3_CH1) */
+#define SERVO_PIN           6
+/* PA7 (TIM3_CH2) */
+#define FAN_PIN             7
+
+/* Cấu hình bộ định thời gian (Timer) trên STM32 để xuất ra tín hiệu băm xung PWM. */
 void Car_Actuator_Init(void);
 
-/* Trọng tự viết hàm đọc trạng thái xe (có xử lý Debounce) ở đây */
-uint8_t Car_Get_ACC_Status(void);
-uint8_t Car_Get_Lock_Status(void);
-
-/* Trọng tự viết hàm điều khiển PWM tốc độ quạt (0, 1, 2) và góc quay Servo (0, 90) */
+/* Điều khiển bật/tắt và thay đổi tốc độ quạt thông gió trong xe. */
 void Actuator_Set_Fan_Speed(uint8_t speed_level);
+
+/* Điều khiển động cơ Servo quay đến một góc nhất định
+ * để mô phỏng việc hạ kính xe xuống cho thoáng khí. */
 void Actuator_Set_Window_Position(uint8_t angle);
 
 #endif /* CAR_ACTUATOR_H */
+
