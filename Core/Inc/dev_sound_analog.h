@@ -13,7 +13,7 @@
 
 /* Private define ------------------------------------------------------------*/
 #define SOUND_PORT              GPIOA
-#define SOUND_PIN_POS           GPIO_MODER_MODER1_Pos 
+#define SOUND_PIN_POS           GPIO_MODER_MODER0_Pos
 
 /* External variables --------------------------------------------------------*/
 extern volatile uint16_t g_soundRawValue; /* Tiền tố g_ cho biến toàn cục */

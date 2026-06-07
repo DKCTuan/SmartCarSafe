@@ -91,6 +91,7 @@ int main(void)
     MX_GPIO_Init();
     MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+    Sound_ADC_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -98,7 +99,19 @@ int main(void)
     while (1)
     {
       /* USER CODE END WHILE */
+    	Sound_Process_Sample(); /* Đọc dữ liệu liên tục */
 
+    	    /* VIỆC RIÊNG 3: Viết logic test phần cứng độc lập */
+    	    if (Sound_Is_Detected() == 1U)
+    	    {
+    	        /* Nếu phát hiện tiếng động (hàm trả về 1), bật LED2 lên */
+    	        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+    	    }
+    	    else
+    	    {
+    	        /* Nếu im lặng, tắt LED2 đi */
+    	        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+    	    }
       /* USER CODE BEGIN 3 */
     }
     /* USER CODE END 3 */
