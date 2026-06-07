@@ -4,27 +4,24 @@
 #include "stm32f4xx.h"
 #include <stdint.h>
 
-/* --- ĐỊNH NGHĨA CHÂN ĐẦU VÀO (CÔNG TẮC)
- * Dùng Port B cho các công tắc */
-#define INPUT_PORT          GPIOB
-/* PB0 - Nút mô phỏng ACC */
-#define ACC_PIN             0   // PB0 - Nút mô phỏng ACC
-#define DOOR_PIN            1   // PB1 - Nút mô phỏng Cửa xe
-#define LOCK_PIN            2   // PB2 - Nút mô phỏng Khóa cửa
+/* Định nghĩa các hằng số về chân cắm */
+#define CAR_STATE_PORT      GPIOC
 
-/* --- CẤU HÌNH THỜI GIAN DEBOUNCE --- */
-#define DEBOUNCE_DELAY_MS   50  // 50 mili-giây
+/* Định nghĩa thời gian chống dội phím (mili-giây) */
+#define DEBOUNCE_TIME_MS    50
 
-/* Khởi tạo phần cứng vi điều khiển để sẵn sàng đọc tín hiệu từ các công tắc. */
+/* Định nghĩa kiểu dữ liệu Enum để quản lý các loại tín hiệu đầu vào của xe */
+typedef enum {
+    CAR_ACC_SIGNAL = 0,
+    CAR_DOOR_SIGNAL,
+    CAR_LOCK_SIGNAL,
+    CAR_SIGNAL_MAX      /* Dùng để giới hạn số lượng phần tử mảng */
+} Car_Signal_Type_t;
+
+/* Hàm khởi tạo cấu hình thanh ghi GPIO Input cho cả 3 chân PC0, PC1, PC2 */
 void Car_State_Init(void);
 
-/* Kiểm tra xem khóa điện của xe (ACC) đang bật hay tắt. */
-uint8_t Car_Get_ACC_Status(void);
-
-/* Giám sát xem có cánh cửa xe nào đang mở vật lý hay không */
-uint8_t Car_Get_Door_Status(void);
-
-/* Kiểm tra xem người dùng đã bấm chốt khóa cửa (Lock) hay chưa. */
-uint8_t Car_Get_Lock_Status(void);
+/* Hàm đọc trạng thái xe có Debounce */
+uint8_t Car_Get_System_Status(Car_Signal_Type_t signal_type);
 
 #endif /* CAR_STATE_H */
