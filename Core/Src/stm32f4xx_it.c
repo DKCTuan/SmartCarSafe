@@ -22,6 +22,7 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "radar_exti.h" /*Mem2*/
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -199,5 +200,14 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /* USER CODE BEGIN 1 */
-
+/*Mem2begin*/
+void EXTI0_IRQHandler(void)
+{
+    if (EXTI->PR & (1U << 0))
+    {
+        EXTI->PR = (1U << 0);
+        Radar_EXTI_Callback();
+    }
+}
+/*Mem2end*/
 /* USER CODE END 1 */

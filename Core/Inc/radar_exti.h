@@ -1,19 +1,20 @@
-/*
- * radar_exti.h
- *
- *  Created on: Jun 3, 2026
- *      Author: DINH KIEU CONG TUAN
+/**
+ * @file    radar_exti.h
+ * @author  Mem 2
+ * @brief   Driver cảm biến Radar RCWL-0516 qua EXTI, dùng thanh ghi thuần.
  */
-
 #ifndef RADAR_EXTI_H
 #define RADAR_EXTI_H
 
 #include "stm32f4xx.h"
+#include <stdint.h>
 
-/* Hàm khởi tạo ngắt ngoài EXTI cho Radar */
+#define RADAR_PRESENCE   1U
+#define RADAR_ABSENCE    0U
+
 void Radar_EXTI_Init(void);
-
-/* Hàm trả về 1 nếu phát hiện chuyển động sau bộ lọc thời gian, 0 nếu không có */
-uint8_t Radar_Is_Detected(void);
+uint8_t Radar_GetPresence(void);
+void Radar_ClearPresence(void);
+void Radar_EXTI_Callback(void);
 
 #endif /* RADAR_EXTI_H */
