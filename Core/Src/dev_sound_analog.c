@@ -29,7 +29,10 @@ void Sound_ADC_Init(void)
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
     /* Cấu hình chân PA0 sang chế độ Analog Mode để nhận tín hiệu cảm biến */
-    SOUND_PORT->MODER &= ~(0U << GPIO_MODER_MODER8_Pos); /* Xóa về 00 trước */
+    SOUND_PORT->MODER |= ~(3U << GPIO_MODER_MODER0_Pos);
+    SOUND_PORT->MODER |= (3U << GPIO_MODER_MODER0_Pos);
+    /* Cấu hình chân PA8 sang chế độ General Output*/
+    SOUND_PORT->MODER &= ~(3U << GPIO_MODER_MODER8_Pos); /* Xóa về 00 trước */
     SOUND_PORT->MODER |=  (1U << GPIO_MODER_MODER8_Pos); /* Nạp 01 vào */
 
     /* 2. ADC1 Configuration (Cấu hình bộ ADC)                                */
