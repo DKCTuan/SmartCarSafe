@@ -1,30 +1,25 @@
-/*
- * car_actuator.h
- *
- *
- */
-
 #ifndef CAR_ACTUATOR_H
 #define CAR_ACTUATOR_H
 
 #include "stm32f4xx.h"
 #include <stdint.h>
 
-/* Định nghĩa chân đầu ra (PWM cho quạt & servo) */
-#define PWM_PORT            GPIOA
-/* PA6 (TIM3_CH1) */
-#define SERVO_PIN           6
-/* PA7 (TIM3_CH2) */
-#define FAN_PIN             7
+/* Dinh nghia cac chan dieu khien mach cau hinh TB6612 va quat */
+#define MOTOR_PORT_A        GPIOA
+#define MOTOR_PORT_B        GPIOB
+#define MOTOR_PWMA_PIN      6   /* Chan PA6 tuong ung TIM3_CH1 */
+#define MOTOR_AIN1_PIN      7   /* Chan PA7 cau hinh GPIO Output */
+#define MOTOR_AIN2_PIN      0   /* Chan PB0 cau hinh GPIO Output */
+#define MOTOR_STBY_PIN      1   /* Chan PB1 cau hinh GPIO Output */
 
-/* Cấu hình bộ định thời gian (Timer) trên STM32 để xuất ra tín hiệu băm xung PWM. */
+/* Dinh nghia chan dieu khien dong co servo mo phong ha kinh */
+/* Do bang chan cua nhom chua co servo, tam thoi dung chan PC8 tuong ung TIM3_CH3 de dung chung TIM3 */
+#define SERVO_PORT          GPIOC
+#define SERVO_PWM_PIN       8   /* Chan PC8 tuong ung TIM3_CH3 */
+
+/* Khai bao cac ham giao tiep khoi chap hanh */
 void Car_Actuator_Init(void);
-
-/* Điều khiển bật/tắt và thay đổi tốc độ quạt thông gió trong xe. */
 void Actuator_Set_Fan_Speed(uint8_t speed_level);
-
-/* Điều khiển động cơ Servo quay đến một góc nhất định
- * để mô phỏng việc hạ kính xe xuống cho thoáng khí. */
 void Actuator_Set_Window_Position(uint8_t angle);
 
 #endif /* CAR_ACTUATOR_H */
