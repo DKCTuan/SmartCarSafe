@@ -20,7 +20,7 @@ extern volatile uint16_t g_soundRawValue; /* Tiền tố g_ cho biến toàn c�
 
 /* Exported functions prototypes ---------------------------------------------*/
 /**
-  * @brief  Initializes ADC1 peripheral and GPIOA Pin 1 for sound sensor.
+  * @brief  Initializes ADC1 peripheral and GPIOA Pin 0 for sound sensor.
   * @retval None
   */
 void Sound_ADC_Init(void);
@@ -36,5 +36,13 @@ void Sound_Process_Sample(void);
   * @retval 1 if sound detected, 0 otherwise
   */
 uint8_t Sound_Is_Detected(void);
+
+
+/**
+ * @brief Sets a dynamic threshold for sound detection.
+ * @param threshold: Threshold value (0 - 4095)
+ * @retval None
+ */
+void Sound_SetThreshold(uint16_t threshold);
 
 #endif /* DEV_SOUND_ANALOG_H */

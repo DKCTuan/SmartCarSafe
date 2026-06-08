@@ -9,7 +9,6 @@
 #include "dev_sound_analog.h"
 
 /* Private define */
-#define SOUND_THRESHOLD 2500U /* Ngưỡng điện áp để phát hiện tiếng động lớn. */
 #define MAX_SAMPLES 5U
 #define DEBOUNCE_CONFIRM 3U
 
@@ -20,6 +19,8 @@ volatile uint16_t g_soundRawValue = 0;
 static uint32_t sg_adcSum = 0;
 static uint8_t sg_sampleCount = 0;
 static uint8_t sg_noiseConfirmCount = 0;
+static uint16_t sg_soundThreshold = 2500U;
+
 /* Exported functions */
 
 void Sound_ADC_Init(void)
@@ -29,11 +30,11 @@ void Sound_ADC_Init(void)
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
     /* Cấu hình chân PA0 sang chế độ Analog Mode để nhận tín hiệu cảm biến */
-    SOUND_PORT->MODER |= ~(3U << GPIO_MODER_MODER0_Pos);
-    SOUND_PORT->MODER |= (3U << GPIO_MODER_MODER0_Pos);
-    /* Cấu hình chân PA8 sang chế độ General Output*/
-    SOUND_PORT->MODER &= ~(3U << GPIO_MODER_MODER8_Pos); /* Xóa về 00 trước */
-    SOUND_PORT->MODER |=  (1U << GPIO_MODER_MODER8_Pos); /* Nạp 01 vào */
+    SOUND_PORT->MODER &= ~(3U << GPIO_MODER_MODER0_Pos);
+    SOUND_PORT->MODER |=  (3U << GPIO_MODER_MODER0_Pos);
+    /* Cấu hình chân PA8 sang chế độ General Output (để test)*/
+    SOUND_PORT->MODER &= ~(3U << GPIO_MODER_MODER8_Pos);
+    SOUND_PORT->MODER |=  (1U << GPIO_MODER_MODER8_Pos);
 
     /* 2. ADC1 Configuration (Cấu hình bộ ADC)                                */
     /* Bật xung clock cấp điện cho bộ ngoại vi ADC1 */
@@ -49,7 +50,7 @@ void Sound_ADC_Init(void)
     ADC1->CR1 &= ~ADC_CR1_RES;
 
     /* Chọn Kênh 0 (PA0) làm lượt quét đầu tiên */
-    ADC1->SQR3 &= ~ADC_SQR3_SQ1;
+    ADC1->SQR3 &= 0U;
 
     /* Kích hoạt (Bật nguồn) bộ ADC1 hoạt động */
     ADC1->CR2 |= ADC_CR2_ADON;
@@ -82,7 +83,7 @@ void Sound_Process_Sample(void)
 
 uint8_t Sound_Is_Detected(void)
 {
-	if (g_soundRawValue > SOUND_THRESHOLD)
+	if (g_soundRawValue > sg_soundThreshold)
 	    {
 	    	sg_noiseConfirmCount++;
 
@@ -97,4 +98,9 @@ uint8_t Sound_Is_Detected(void)
 	    }
 
     return 0U;
+}
+
+void Sound_SetThreshold(uint16_t threshold)
+{
+	sg_soundThreshold = threshold;
 }
