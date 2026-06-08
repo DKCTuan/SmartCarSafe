@@ -20,6 +20,7 @@ static uint32_t sg_adcSum = 0;
 static uint8_t sg_sampleCount = 0;
 static uint8_t sg_noiseConfirmCount = 0;
 static uint16_t sg_soundThreshold = 2500U;
+static volatile uint16_t sg_soundRawValue = 0;
 
 /* Exported functions */
 
@@ -50,7 +51,7 @@ void Sound_ADC_Init(void)
     ADC1->CR1 &= ~ADC_CR1_RES;
 
     /* Chọn Kênh 0 (PA0) làm lượt quét đầu tiên */
-    ADC1->SQR3 &= 0U;
+    ADC1->SQR3 = 0U;
 
     /* Kích hoạt (Bật nguồn) bộ ADC1 hoạt động */
     ADC1->CR2 |= ADC_CR2_ADON;
@@ -73,7 +74,7 @@ void Sound_Process_Sample(void)
 
     	if (sg_sampleCount >= MAX_SAMPLES)
     	{
-    		g_soundRawValue = (uint16_t)(sg_adcSum / MAX_SAMPLES);
+    		sg_soundRawValue = (uint16_t)(sg_adcSum / MAX_SAMPLES);
 
     		sg_adcSum = 0;
     		sg_sampleCount = 0;
@@ -83,7 +84,7 @@ void Sound_Process_Sample(void)
 
 uint8_t Sound_Is_Detected(void)
 {
-	if (g_soundRawValue > sg_soundThreshold)
+	if (sg_soundRawValue > sg_soundThreshold)
 	    {
 	    	sg_noiseConfirmCount++;
 
@@ -103,4 +104,9 @@ uint8_t Sound_Is_Detected(void)
 void Sound_SetThreshold(uint16_t threshold)
 {
 	sg_soundThreshold = threshold;
+}
+
+uint16_t Sound_GetRawValue(void)
+{
+    return sg_soundRawValue;
 }

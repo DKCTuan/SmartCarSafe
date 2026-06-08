@@ -16,7 +16,6 @@
 #define SOUND_PIN_POS           GPIO_MODER_MODER0_Pos
 
 /* External variables --------------------------------------------------------*/
-extern volatile uint16_t g_soundRawValue; /* Tiền tố g_ cho biến toàn cục */
 
 /* Exported functions prototypes ---------------------------------------------*/
 /**
@@ -37,12 +36,17 @@ void Sound_Process_Sample(void);
   */
 uint8_t Sound_Is_Detected(void);
 
-
 /**
  * @brief Sets a dynamic threshold for sound detection.
  * @param threshold: Threshold value (0 - 4095)
  * @retval None
  */
 void Sound_SetThreshold(uint16_t threshold);
+
+/**
+  * @brief  Gets the current filtered raw value of the sound sensor.
+  * @retval 12-bit ADC value (0 - 4095)
+  */
+uint16_t Sound_GetRawValue(void);
 
 #endif /* DEV_SOUND_ANALOG_H */
