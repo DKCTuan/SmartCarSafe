@@ -1,7 +1,7 @@
 /**
  * @file    radar_exti.h
  * @author  Mem 2
- * @brief   Driver for RCWL-0516 Radar sensor using EXTI and bare-metal registers.
+ * @brief   Driver for RCWL-0516 Radar sensor using EXTI1 (PA1) and bare-metal registers.
  * @date    2026
  */
 
@@ -31,14 +31,14 @@ extern volatile uint32_t g_tick_ms;
 /* ------------------------------------------------------------------ */
 
 /**
- * @brief  Initializes GPIOA Pin 0 as Input Pull-Down and configures EXTI0.
+ * @brief  Initializes GPIOA Pin 1 as Input Pull-Down and configures EXTI1.
  * Sets up NVIC with priority 2 for external interrupt handling.
  * @note   This function uses direct register access (bare-metal).
  */
 void Radar_EXTI_Init(void);
 
 /**
- * @brief  ISR Callback function executed when an EXTI0 trigger occurs.
+ * @brief  ISR Callback function executed when an EXTI1 trigger occurs.
  * Sets the raw trigger flag to acknowledge motion detection.
  */
 void Radar_EXTI_Callback(void);

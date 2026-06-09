@@ -201,13 +201,20 @@ void SysTick_Handler(void)
 
 /* USER CODE BEGIN 1 */
 /*Mem2begin*/
-void EXTI0_IRQHandler(void)
+void EXTI1_IRQHandler(void)
 {
-    if (EXTI->PR & (1U << 0))
+    /* USER CODE BEGIN EXTI1_IRQn 0 */
+    if (EXTI->PR & (1U << 1))
     {
-        EXTI->PR = (1U << 0);
+        /* * Clear pending flag BEFORE calling callback.
+         * STM32 clears PR register by writing 1 to the bit (not 0).
+         * If cleared after callback, a re-trigger during callback
+         * execution would be lost.
+         */
+        EXTI->PR = (1U << 1);
         Radar_EXTI_Callback();
     }
+    /* USER CODE END EXTI1_IRQn 0 */
 }
 /*Mem2end*/
 /* USER CODE END 1 */

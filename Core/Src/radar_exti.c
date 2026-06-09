@@ -1,7 +1,7 @@
 /**
  * @file    radar_exti.c
  * @author  Mem 2
- * @brief   RCWL-0516 Radar sensor driver with non-blocking time filter and debounce.
+ * @brief   RCWL-0516 Radar sensor driver mapped to PA1 (EXTI1) with non-blocking filter.
  * @date    2026
  */
 
@@ -36,21 +36,23 @@ void Radar_EXTI_Init(void){
     RCC->AHB1ENR |= (1U << 0);    /* Enable GPIOA clock */
     RCC->APB2ENR |= (1U << 14);   /* Enable SYSCFG clock */
 
-    /* 2. CONFIGURE PA0 AS INPUT WITH PULL-DOWN */
-    GPIOA->MODER &= ~(3U << (0 * 2));  /* Set PA0 to Input Mode (00) */
-    GPIOA->PUPDR &= ~(3U << (0 * 2));  /* Clear existing PUPDR bits first to prevent Reserved state */
-    GPIOA->PUPDR |=  (2U << (0 * 2));  /* Set PA0 to Pull-Down Mode (10) */
+    /* 2. CONFIGURE PA1 AS INPUT WITH PULL-DOWN */
+    GPIOA->MODER &= ~(3U << (1 * 2));  /* Set PA1 to Input Mode (00) */
+    GPIOA->PUPDR &= ~(3U << (1 * 2));  /* Clear existing PUPDR bits for Pin 1 */
+    GPIOA->PUPDR |=  (2U << (1 * 2));  /* Set PA1 to Pull-Down Mode (10) */
 
-    /* 3. CONFIGURE EXTI LINE 0 */
-    SYSCFG->EXTICR[0] &= ~(15U << (0 * 4)); /* Map EXTI0 line to Port A (PA0) */
-    EXTI->IMR  |=  (1U << 0);     /* Unmask EXTI0 interrupt line */
-    EXTI->RTSR |=  (1U << 0);     /* Enable Rising Edge trigger (detect motion initiation) */
-    EXTI->FTSR &= ~(1U << 0);     /* Disable Falling Edge trigger */
-    EXTI->PR    =  (1U << 0);     /* Clear any pending stale interrupt flags */
+    /* 3. CONFIGURE EXTI LINE 1 (For Pin 1) */
+    /* Map EXTI1 line to Port A (PA1) by clearing bits [7:4] in EXTICR[0] */
+    SYSCFG->EXTICR[0] &= ~(15U << (1 * 4));
 
-    /* 4. CONFIGURE NVIC (Nested Vectored Interrupt Controller) */
-    NVIC_SetPriority(EXTI0_IRQn, 2);   /* Set interrupt priority to 2 */
-    NVIC_EnableIRQ(EXTI0_IRQn);        /* Enable EXTI0 global interrupt */
+    EXTI->IMR  |=  (1U << 1);     /* Unmask EXTI1 interrupt line */
+    EXTI->RTSR |=  (1U << 1);     /* Enable Rising Edge trigger for Line 1 */
+    EXTI->FTSR &= ~(1U << 1);     /* Disable Falling Edge trigger for Line 1 */
+    EXTI->PR    =  (1U << 1);     /* Clear pending flags for Line 1 */
+
+    /* 4. CONFIGURE NVIC FOR EXTI1 */
+    NVIC_SetPriority(EXTI1_IRQn, 2);   /* Set EXTI1 priority to 2 */
+    NVIC_EnableIRQ(EXTI1_IRQn);        /* Enable EXTI1 global interrupt */
 }
 
 void Radar_EXTI_Callback(void){
@@ -58,40 +60,44 @@ void Radar_EXTI_Callback(void){
 }
 
 uint8_t Radar_Is_Detected(void){
-    /* Read current hardware pin state of PA0 directly from Input Data Register */
-    uint8_t pin_high = (GPIOA->IDR & (1U << 0)) ? 1U : 0U;
+    /* Read hardware pin state of PA1 from Input Data Register */
+    uint8_t pin_high = (GPIOA->IDR & (1U << 1)) ? 1U : 0U;
 
-    /* CASE 1: Raw interrupt triggered AND hardware pin is confirmed HIGH */
+    /* CASE 1: Raw interrupt triggered AND pin is physically HIGH */
     if ((s_raw_trigger == RADAR_PRESENCE) && (pin_high == 1U))
     {
-        s_hold_active = 0U; /* Intercept and abort HOLD countdown if motion re-occurs */
+        /* New detection resets any ongoing hold timer */
+        s_hold_active = 0U;
 
+        /* Start filter timer only once per detection event */
         if (s_filter_active == 0U) {
-            s_filter_start  = g_tick_ms; /* Record starting timestamp of the pulse */
-            s_filter_active = 1U;        /* Activate the validation filter flag */
+            s_filter_start  = g_tick_ms;
+            s_filter_active = 1U;
         }
 
-        /* * Check if signal has sustained HIGH for >= 60ms.
-         * Standard unsigned 32-bit subtraction safely handles SysTick counter overflow wrap-around.
-         */
+        /* Confirm presence only if signal stays HIGH for >= RADAR_FILTER_MS */
         if ((g_tick_ms - s_filter_start) >= RADAR_FILTER_MS) {
             s_validated_state = RADAR_PRESENCE; /* Motion officially validated */
         }
     }
-    /* CASE 2: Hardware pin dropped to LOW or no active raw trigger exists */
+    /* CASE 2: Pin dropped LOW or no raw trigger */
     else
     {
-        s_filter_active = 0U; /* Reset the 60ms time filter */
+        /* Reset filter - signal was too short, likely noise */
+        s_filter_active = 0U;
         s_raw_trigger   = RADAR_ABSENCE;
 
-        /* If previous state was valid PRESENCE, initiate the 3-second hold buffer */
+        /* * HOLD TIMER: RCWL-0516 pulls OUT pin LOW after ~2-3s automatically,
+         * even if a person is still present. We hold PRESENCE state for
+         * RADAR_HOLD_MS to avoid false ABSENCE during that window.
+         */
         if (s_validated_state == RADAR_PRESENCE) {
             if (s_hold_active == 0U) {
-                s_hold_start  = g_tick_ms; /* Record starting timestamp of the hold window */
+                s_hold_start  = g_tick_ms;
                 s_hold_active = 1U;
             }
 
-            /* If 3 seconds have passed without any new motion, revert state back to ABSENCE */
+            /* Only clear presence after hold period expires */
             if ((g_tick_ms - s_hold_start) >= RADAR_HOLD_MS) {
                 s_validated_state = RADAR_ABSENCE;
                 s_hold_active     = 0U;
