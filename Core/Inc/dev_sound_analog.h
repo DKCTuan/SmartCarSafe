@@ -18,11 +18,6 @@
 /* External variables --------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
-/**
-  * @brief  Initializes ADC1 peripheral and GPIOA Pin 0 for sound sensor.
-  * @retval None
-  */
-void Sound_ADC_Init(void);
 
 /**
   * @brief  Processes and reads the latest ADC conversion sample.
@@ -49,4 +44,11 @@ void Sound_SetThreshold(uint16_t threshold);
   */
 uint16_t Sound_GetRawValue(void);
 
+/**
+  * @brief  Initializes ADC1 and configures flexible GPIO pins for sound sensor and alarm.
+  * @param  soundPinPos: Bit position of the sound sensor pin in MODER.
+  * @param  alarmPinPos: Bit position of the alarm pin in MODER.
+  * @retval None
+  */
+void Sound_ADC_Init(uint8_t soundPinPos, uint8_t alarmPinPos);
 #endif /* DEV_SOUND_ANALOG_H */

@@ -13,7 +13,6 @@
 #define DEBOUNCE_CONFIRM 3U
 
 /* Private variables */
-volatile uint16_t g_soundRawValue = 0;
 
 /* Các biến static cục bộ cho thuật toán lọc. */
 static uint32_t sg_adcSum = 0;
@@ -24,18 +23,18 @@ static volatile uint16_t sg_soundRawValue = 0;
 
 /* Exported functions */
 
-void Sound_ADC_Init(void)
+void Sound_ADC_Init(uint8_t soundPinPos, uint8_t alarmPinPos)
 {
     /* 1. GPIO Configuration */
     /* Bật xung clock cho Port A */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
-    /* Cấu hình chân PA0 sang chế độ Analog Mode để nhận tín hiệu cảm biến */
-    SOUND_PORT->MODER &= ~(3U << GPIO_MODER_MODER0_Pos);
-    SOUND_PORT->MODER |=  (3U << GPIO_MODER_MODER0_Pos);
-    /* Cấu hình chân PA8 sang chế độ General Output (để test)*/
-    SOUND_PORT->MODER &= ~(3U << GPIO_MODER_MODER8_Pos);
-    SOUND_PORT->MODER |=  (1U << GPIO_MODER_MODER8_Pos);
+    /* Cấu hình chân cảm biến âm thanh*/
+    SOUND_PORT->MODER &= ~(3U << soundPinPos);
+    SOUND_PORT->MODER |=  (3U << soundPinPos);
+    /* Cấu hình chân test còi */
+    SOUND_PORT->MODER &= ~(3U << alarmPinPos);
+    SOUND_PORT->MODER |=  (1U << alarmPinPos);
 
     /* 2. ADC1 Configuration (Cấu hình bộ ADC)                                */
     /* Bật xung clock cấp điện cho bộ ngoại vi ADC1 */
