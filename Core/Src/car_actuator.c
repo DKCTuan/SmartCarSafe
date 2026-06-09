@@ -5,8 +5,8 @@ void Car_Actuator_Init(void) {
     RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN);
     RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
-    /* Cau hinh chan va huong ra cho mach dieu khien dong co TB6612 */
-    /* Xoa cac bit cau hinh cu cua chan PA7 (AIN1) va chuyen thanh GPIO Output (01) */
+    /* Cau hinh chan va huong ra cho mach dieu khien dong co TB6612
+     * Xoa cac bit cau hinh cu cua chan PA7 (AIN1) va chuyen thanh GPIO Output (01) */
     MOTOR_PORT_A->MODER &= ~GPIO_MODER_MODER7;
     MOTOR_PORT_A->MODER |= GPIO_MODER_MODER7_0;
 
@@ -18,8 +18,8 @@ void Car_Actuator_Init(void) {
     MOTOR_PORT_A->ODR &= ~GPIO_ODR_ODR_7;
     MOTOR_PORT_B->ODR &= ~(GPIO_ODR_ODR_0 | GPIO_ODR_ODR_1);
 
-    /* Cau hinh chan chuc nang thay the Alternate Function cho chan PWMA (PA6) va servo (PC8) */
-    /* Chuyen chan PA6 (PWMA) sang che do Alternate Function (10) */
+    /* Cau hinh chan chuc nang thay the Alternate Function cho chan PWMA (PA6) va servo (PC8)
+     * Chuyen chan PA6 (PWMA) sang che do Alternate Function (10) */
     MOTOR_PORT_A->MODER &= ~GPIO_MODER_MODER6;
     MOTOR_PORT_A->MODER |= GPIO_MODER_MODER6_1;
 
@@ -35,8 +35,8 @@ void Car_Actuator_Init(void) {
     SERVO_PORT->AFR[1] &= ~GPIO_AFRH_AFSEL8;
     SERVO_PORT->AFR[1] |= (2 << GPIO_AFRH_AFSEL8_Pos);
 
-    /* Cau hinh bo dinh thoi TIM3 de tao ra tan so bam xung xung quanh moc 50Hz (chu ky 20ms) */
-    /* Prescaler = 16 - 1 giup clock cua timer giam xuong con 1MHz (moi tick ung voi 1 micro giay) */
+    /* Cau hinh bo dinh thoi TIM3 de tao ra tan so bam xung xung quanh moc 50Hz (chu ky 20ms)
+     * Prescaler = 16 - 1 giup clock cua timer giam xuong con 1MHz (moi tick ung voi 1 micro giay) */
     TIM3->PSC = 16 - 1;
 
     /* Auto-Reload Register nap gia tri 20000 giup chu ky dat dung 20ms (50Hz) */
@@ -55,6 +55,9 @@ void Car_Actuator_Init(void) {
 
     /* Bat bo dem cua TIM3 de bat dau phat xung */
     TIM3->CR1 |= TIM_CR1_CEN;
+
+    /* Kich hoat Update Event de nap ngay cac gia tri PSC, ARR, CCR vao shadow register */
+    TIM3->EGR |= TIM_EGR_UG;
 
     /* Thiet lap trang thai khoi dau an toan: Quat tat, kinh o vi tri dong hoan toan (0 do) */
     TIM3->CCR1 = 0;
@@ -101,10 +104,10 @@ void Actuator_Set_Window_Position(uint8_t angle) {
         angle = 90;
     }
 
-    /* Cong thuc noi suy tuyen tinh de tinh do rong xung dieu khien servo SG90 */
-    /* Goc 0 do ung voi xung rong 1.0ms (CCR = 1000) */
-    /* Goc 90 do ung voi xung rong 1.5ms (CCR = 1500) */
-    /* Gia tri CCR = 1000 + (angle * 500) / 90 */
+    /* Cong thuc noi suy tuyen tinh de tinh do rong xung dieu khien servo SG90
+     * Goc 0 do ung voi xung rong 1.0ms (CCR = 1000)
+     * Goc 90 do ung voi xung rong 1.5ms (CCR = 1500)
+     * CCR = 1000 + (angle * 500) / 90 */
     uint32_t pulse_width = 1000 + ((uint32_t)angle * 500) / 90;
 
     /* Cap nhat gia tri vao thanh ghi so sanh kenh 3 de thay doi goc servo */
