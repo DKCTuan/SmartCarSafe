@@ -103,14 +103,16 @@ uint8_t Car_Get_System_Status(Car_Signal_Type_t signal_type) {
 }
 
 void Car_State_DeInit(void) {
-    /* Đưa các chân PC0, PC1, PC2 về trạng thái reset mặc định (analog mode, không trở kéo) */
+    /* Xóa 2 bit MODER của PC0, PC1, PC2 trước */
+    CAR_STATE_PORT->MODER &= ~(GPIO_MODER_MODER0 |
+                               GPIO_MODER_MODER1 |
+                               GPIO_MODER_MODER2);
+    /* Ghi 11 để về Analog mode (trạng thái reset mặc định STM32) */
+    CAR_STATE_PORT->MODER |=  (GPIO_MODER_MODER0 |
+                               GPIO_MODER_MODER1 |
+                               GPIO_MODER_MODER2);
 
-    /* Ghi bit 11 vào MODER để chuyển về analog mode (mặc định sau khi reset) */
-    CAR_STATE_PORT->MODER |= (GPIO_MODER_MODER0 |
-                              GPIO_MODER_MODER1 |
-                              GPIO_MODER_MODER2);
-
-    /* Xóa các bit trong PUPDR để tắt điện trở pull-up (trở về 00 - no pull) */
+    /* Tắt pull-up/pull-down */
     CAR_STATE_PORT->PUPDR &= ~(GPIO_PUPDR_PUPDR0 |
                                GPIO_PUPDR_PUPDR1 |
                                GPIO_PUPDR_PUPDR2);
