@@ -42,7 +42,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-
+volatile uint32_t g_tick_ms = 0; /*mem2: Biến hệ thống tăng tiến theo mili giây*/
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -184,7 +184,7 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-
+	g_tick_ms++; /*mem2*/
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
