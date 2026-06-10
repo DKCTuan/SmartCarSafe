@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "dev_sound_analog.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,7 +43,7 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+Sound_Config_t soundSensor;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,14 +91,47 @@ int main(void)
     MX_GPIO_Init();
     MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+    /* Cấu hình cảm biến âm thanh KY-037
+     * PA0 -> ADC Channel 0
+     */
+    soundSensor.port = GPIOA;
+    soundSensor.pin = 0U;
+    soundSensor.adcChannel = 0U;
+    soundSensor.adc = ADC1;
+    /* Khởi tạo driver âm thanh */
+    Sound_Init(&soundSensor);
+
+    /* Đặt ngưỡng cảnh báo */
+    Sound_SetThreshold(2500U);
   /* USER CODE END 2 */
 
   /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1)
     {
-      /* USER CODE END WHILE */
+    /* Đọc ADC và xử lý bộ lọc */
+    	Sound_Process();
 
+    	/* Kiểm tra trạng thái âm thanh */
+    	if (Sound_IsDetected() == 1U)
+    	{
+    		/* Có âm thanh bất thường */
+    	    HAL_GPIO_WritePin(
+    	    	LD2_GPIO_Port,
+				LD2_Pin,
+				GPIO_PIN_SET
+    	    	);
+    	 }
+    	 else
+    	 {
+    	    /* Không phát hiện âm thanh */
+    	    HAL_GPIO_WritePin(
+    	        LD2_GPIO_Port,
+    	        LD2_Pin,
+    	        GPIO_PIN_RESET
+    	        );
+    	 }
+      /* USER CODE END WHILE */
       /* USER CODE BEGIN 3 */
     }
     /* USER CODE END 3 */

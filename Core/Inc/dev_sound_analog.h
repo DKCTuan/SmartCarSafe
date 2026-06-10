@@ -12,24 +12,39 @@
 #include "stm32f4xx.h"
 
 /* Private define ------------------------------------------------------------*/
-#define SOUND_PORT              GPIOA
-#define SOUND_PIN_POS           GPIO_MODER_MODER0_Pos
 
 /* External variables --------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
 
 /**
+ * @brief Cấu trúc lưu cấu hình cho cảm biến âm thanh.
+ *
+ * Chỉ cần khai báo:
+ * - Port GPIO sử dụng
+ * - Chân GPIO
+ * - ADC tương ứng
+ * - ADC Channel
+ * */
+typedef struct
+{
+	GPIO_TypeDef *port;
+	uint8_t pin;
+	ADC_TypeDef *adc;
+	uint8_t adcChannel;
+}Sound_Config_t;
+
+/**
   * @brief  Processes and reads the latest ADC conversion sample.
   * @retval None
   */
-void Sound_Process_Sample(void);
+void Sound_Process(void);
 
 /**
   * @brief  Checks if the sound intensity exceeds the threshold.
   * @retval 1 if sound detected, 0 otherwise
   */
-uint8_t Sound_Is_Detected(void);
+uint8_t Sound_IsDetected(void);
 
 /**
  * @brief Sets a dynamic threshold for sound detection.
@@ -42,13 +57,13 @@ void Sound_SetThreshold(uint16_t threshold);
   * @brief  Gets the current filtered raw value of the sound sensor.
   * @retval 12-bit ADC value (0 - 4095)
   */
-uint16_t Sound_GetRawValue(void);
+uint16_t Sound_GetValue(void);
 
 /**
   * @brief  Initializes ADC1 and configures flexible GPIO pins for sound sensor and alarm.
-  * @param  soundPinPos: Bit position of the sound sensor pin in MODER.
-  * @param  alarmPinPos: Bit position of the alarm pin in MODER.
+  * @param  config Con trỏ chứa cấu hình phần cứng
   * @retval None
   */
-void Sound_ADC_Init(uint8_t soundPinPos, uint8_t alarmPinPos);
+void Sound_Init(const Sound_Config_t *config);
+
 #endif /* DEV_SOUND_ANALOG_H */
