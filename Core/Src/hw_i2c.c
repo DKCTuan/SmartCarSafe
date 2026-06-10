@@ -1,112 +1,158 @@
 /**
  * @file    hw_i2c.c
  * @author  Mem 3 - Nguyễn Công Trường
- * @brief   Thư viện điều khiển I2C1 ở tầng thanh ghi (Hardware Layer),
- * cung cấp các hàm Init, Start, Stop và Read/Write cơ bản.
+ * @brief   Lớp trừu tượng cho I2C (Hỗ trợ các module I2Cx).
+ * Định nghĩa các hàm cấu hình phần cứng và thao tác truyền/nhận.
  */
 
 #include "hw_i2c.h"
 
-void I2C1_Init(void){
-	/* CẤP XUNG NHỊP CHO GPIOB VÀ I2C1 */
-	RCC->AHB1ENR |= (1U << 1);
-	RCC->APB1ENR |= (1U << 21);
+/**
+ * @brief  Cấu hình một chân GPIO bất kỳ sang chế độ I2C (AF, Open-Drain, Pull-up).
+ * @param  GPIOx:  Con trỏ tới Port chứa chân đó (VD: GPIOA, GPIOB).
+ * @param  pin:    Số thứ tự chân (0 - 15).
+ * @param  af_num: Mã Alternate Function (VD: 4 hoặc 9 cho I2C).
+ * @retval None
+ */
+void HW_GPIO_Init_I2C_Pin(GPIO_TypeDef *GPIOx, uint8_t pin, uint8_t af_num) {
+    /* 1. Kích hoạt Clock cho Port GPIO tương ứng một cách tự động */
+    if      (GPIOx == GPIOA) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; }
+    else if (GPIOx == GPIOB) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; }
+    else if (GPIOx == GPIOC) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; }
 
-	/* CẤU HÌNH CHÂN PB8 (SCL) VÀ PB9 (SDA) */
-	/* Chế độ Alternate Function (AF) */
-	GPIOB->MODER &= ~((3U << (8 * 2)) | (3U << (9 * 2)));
-	GPIOB->MODER |=  ((2U << (8 * 2)) | (2U << (9 * 2)));
+    /* 2. Cấu hình Moder: Chuyển sang Alternate Function */
+    GPIOx->MODER &= ~(3U << (pin * 2));
+    GPIOx->MODER |=  (2U << (pin * 2));
 
-	/* Chế độ Open-Drain (Bắt buộc cho I2C) */
-	GPIOB->OTYPER |= (1U << 8) | (1U << 9);
+    /* 3. Cấu hình Output Type: Open-Drai */
+    GPIOx->OTYPER |= (1U << pin);
 
-	/* Bật điện trở kéo lên (Pull-up) */
-	GPIOB->PUPDR &= ~((3U << (8 * 2)) | (3U << (9 * 2)));
-	GPIOB->PUPDR |=  ((1U << (8 * 2)) | (1U << (9 * 2)));
+    /* 4. Cấu hình Pull-up */
+    GPIOx->PUPDR &= ~(3U << (pin * 2));
+    GPIOx->PUPDR |=  (1U << (pin * 2));
 
-	/* Chọn chức năng AF4 (I2C1) cho PB8 và PB9 */
-	GPIOB->AFR[1] &= ~((15U << (0 * 4)) | (15U << (1 * 4))); /* AFR[1] là thanh ghi AFRH */
-	GPIOB->AFR[1] |=  ((4U << (0 * 4)) | (4U << (1 * 4)));
-
-	/* RESET BỘ I2C1 (SOFTWARE RESET) */
-	I2C1->CR1 |= (1U << 15);
-	I2C1->CR1 &= ~(1U << 15);
-
-	/* CẤU HÌNH THAM SỐ I2C1 (GIẢ SỬ APB1 CLOCK = 16MHZ) */
-	/* Thiết lập tần số xung nhịp ngoại vi (16 MHz) */
-	I2C1->CR2 = 16;
-
-	/* Cấu hình thanh ghi điều khiển xung nhịp (CCR) cho chế độ Standard Mode (100kHz) */
-	/* Công thức: T_high = CCR * T_PCLK1 => CCR = 16MHz / (2 * 100kHz) = 80 */
-	I2C1->CCR = 80;
-
-	/* Cấu hình thời gian sườn lên tối đa (TRISE) */
-	/* Công thức: TRISE = (1000ns / T_PCLK1) + 1 = (1000ns / 62.5ns) + 1 = 17 */
-	I2C1->TRISE = 17;
-
-	/* BẬT I2C1 */
-	I2C1->CR1 |= (1U << 0);
+    /* 5. Cấu hình Alternate Function Register (AFR) */
+    /* Thanh ghi AFR được chia làm 2: AFR[0] cho chân 0-7, AFR[1] cho chân 8-15 */
+    if (pin < 8) {
+        GPIOx->AFR[0] &= ~(15U << (pin * 4));
+        GPIOx->AFR[0] |=  (af_num << (pin * 4));
+    } else {
+        uint8_t pin_high = pin - 8;
+        GPIOx->AFR[1] &= ~(15U << (pin_high * 4));
+        GPIOx->AFR[1] |=  (af_num << (pin_high * 4));
+    }
 }
 
-void I2C1_Start(void) {
-	/* KÍCH HOẠT BỘ TẠO ACK VÀ PHÁT TÍN HIỆU START */
-	I2C1->CR1 |= (1U << 10);
-	I2C1->CR1 |= (1U << 8);
 
-	/* ĐỢI CHO ĐẾN KHI CỜ SB (START BIT) ĐƯỢC BẬT */
-	while (!(I2C1->SR1 & (1U << 0)));
+/**
+ * @brief  Khởi tạo bộ ngoại vi I2C (Cấu hình Baudrate, TRISE, bật I2C).
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C cần dùng (I2C1, I2C2, I2C3).
+ * @retval None
+ */
+void HW_I2C_Init(I2C_TypeDef *I2Cx) {
+    /* 1. Kích hoạt Clock cho bộ I2C được truyền vào */
+    if      (I2Cx == I2C1) { RCC->APB1ENR |= RCC_APB1ENR_I2C1EN; }
+    else if (I2Cx == I2C2) { RCC->APB1ENR |= RCC_APB1ENR_I2C2EN; }
+    else if (I2Cx == I2C3) { RCC->APB1ENR |= RCC_APB1ENR_I2C3EN; }
+
+    /* 2. Khởi động lại */
+    I2Cx->CR1 |= I2C_CR1_SWRST;
+    I2Cx->CR1 &= ~I2C_CR1_SWRST;
+
+    /* 3. Cấu hình thông số (APB1 = 16MHz, tốc độ I2C = 100kHz) */
+    I2Cx->CR2   = 16U;
+    I2Cx->CCR   = 80U;
+    I2Cx->TRISE = 17U;
+
+    /* 4. Cho phép I2Cx hoạt động */
+    I2Cx->CR1 |= I2C_CR1_PE;
 }
 
-void I2C1_Stop(void) {
-	/* PHÁT TÍN HIỆU STOP */
-	I2C1->CR1 |= (1U << 9);
+/**
+ * @brief  Phát điều kiện START trên bus I2C.
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C đang sử dụng.
+ * @retval None
+ */
+void HW_I2C_Start(I2C_TypeDef *I2Cx) {
+    /* Kích hoạt cờ tự động trả lời ACK và phát START */
+    I2Cx->CR1 |= (I2C_CR1_ACK | I2C_CR1_START);
+
+    /* Chờ đến khi cờ START (SB) được set */
+    while ((I2Cx->SR1 & I2C_SR1_SB) == 0U);
 }
 
-void I2C1_WriteAddress(uint8_t address) {
-	/* GỬI ĐỊA CHỈ (ĐÃ CHỨA BIT R/W) */
-	I2C1->DR = address;
-
-	/* ĐỢI CHO ĐẾN KHI CỜ ADDR (ADDRESS SENT) ĐƯỢC BẬT */
-	while (!(I2C1->SR1 & (1U << 1)));
-
-	/* XÓA CỜ ADDR BẰNG CÁCH ĐỌC SR1 RỒI ĐẾN SR2 */
-	uint32_t temp = I2C1->SR1;
-	temp = I2C1->SR2;
-	(void)temp; /* Ép kiểu void để tránh cảnh báo biến không sử dụng */
+/**
+ * @brief  Phát điều kiện STOP trên bus I2C.
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C đang sử dụng.
+ * @retval None
+ */
+void HW_I2C_Stop(I2C_TypeDef *I2Cx) {
+    I2Cx->CR1 |= I2C_CR1_STOP;
 }
 
-void I2C1_WriteData(uint8_t data) {
-	/* ĐỢI CHO ĐẾN KHI THANH GHI DR TRỐNG (TXE BẬT) */
-	while (!(I2C1->SR1 & (1U << 7)));
+/**
+ * @brief  Gửi địa chỉ của thiết bị Slave.
+ * @param  I2Cx:    Con trỏ tới ngoại vi I2C đang sử dụng.
+ * @param  address: Địa chỉ 8-bit của thiết bị Slave.
+ * @retval None
+ */
+void HW_I2C_WriteAddress(I2C_TypeDef *I2Cx, uint8_t address) {
+    /* Ghi địa chỉ vào thanh ghi dữ liệu */
+    I2Cx->DR = address;
 
-	/* ĐẨY DỮ LIỆU VÀO THANH GHI */
-	I2C1->DR = data;
+    /* Chờ cờ Address (ADDR) bật lên */
+    while ((I2Cx->SR1 & I2C_SR1_ADDR) == 0U);
 
-	/* ĐỢI CHO ĐẾN KHI DỮ LIỆU TRUYỀN XONG (BTF BẬT) */
-	while (!(I2C1->SR1 & (1U << 2)));
+    /* Xóa cờ ADDR bằng chuỗi đọc SR1 -> SR2 */
+    volatile uint32_t clear_flag = I2Cx->SR1;
+    clear_flag = I2Cx->SR2;
+    (void)clear_flag;
 }
 
-uint8_t I2C1_ReadData_ACK(void) {
-	/* BẬT PHẢN HỒI ACK BÁO CHO SLAVE MUỐN ĐỌC TIẾP */
-	I2C1->CR1 |= (1U << 10);
+/**
+ * @brief  Gửi 1 byte dữ liệu lên bus I2C.
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C đang sử dụng.
+ * @param  data: Dữ liệu (8-bit) cần truyền đi.
+ * @retval None
+ */
+void HW_I2C_WriteData(I2C_TypeDef *I2Cx, uint8_t data) {
+    /* Chờ thanh ghi dữ liệu trống (TXE) */
+    while ((I2Cx->SR1 & I2C_SR1_TXE) == 0U);
 
-	/* ĐỢI ĐẾN KHI THANH GHI NHẬN CÓ DỮ LIỆU (RXNE BẬT) */
-	while (!(I2C1->SR1 & (1U << 6)));
+    /* Đẩy dữ liệu vào thanh ghi */
+    I2Cx->DR = data;
 
-	/* ĐỌC VÀ TRẢ VỀ DỮ LIỆU */
-	return (uint8_t)I2C1->DR;
+    /* Chờ quá trình truyền hoàn tất (BTF) */
+    while ((I2Cx->SR1 & I2C_SR1_BTF) == 0U);
 }
 
-uint8_t I2C1_ReadData_NACK(void) {
-	/* TẮT PHẢN HỒI ACK BÁO CHO SLAVE ĐÂY LÀ BYTE CUỐI */
-	I2C1->CR1 &= ~(1U << 10);
+/**
+ * @brief  Đọc 1 byte dữ liệu từ bus I2C và trả về tín hiệu ACK.
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C đang sử dụng.
+ * @retval uint8_t: Dữ liệu đọc được.
+ */
+uint8_t HW_I2C_ReadData_ACK(I2C_TypeDef *I2Cx) {
+    /* Bật phản hồi ACK */
+    I2Cx->CR1 |= I2C_CR1_ACK;
 
-	/* SINH TÍN HIỆU STOP NGAY SAU KHI NHẬN XONG */
-	I2C1->CR1 |= (1U << 9);
+    /* Chờ nhận đủ dữ liệu (RXNE) */
+    while ((I2Cx->SR1 & I2C_SR1_RXNE) == 0U);
 
-	/* ĐỢI ĐẾN KHI THANH GHI NHẬN CÓ DỮ LIỆU (RXNE BẬT) */
-	while (!(I2C1->SR1 & (1U << 6)));
+    return (uint8_t)(I2Cx->DR);
+}
 
-	/* ĐỌC VÀ TRẢ VỀ DỮ LIỆU */
-	return (uint8_t)I2C1->DR;
+/**
+ * @brief  Đọc 1 byte dữ liệu từ bus I2C và trả về tín hiệu NACK kèm STOP.
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C đang sử dụng.
+ * @retval uint8_t: Dữ liệu đọc được.
+ */
+uint8_t HW_I2C_ReadData_NACK(I2C_TypeDef *I2Cx) {
+    /* Tắt phản hồi ACK và sinh tín hiệu STOP */
+    I2Cx->CR1 &= ~I2C_CR1_ACK;
+    I2Cx->CR1 |= I2C_CR1_STOP;
+
+    /* Chờ nhận đủ dữ liệu (RXNE) */
+    while ((I2Cx->SR1 & I2C_SR1_RXNE) == 0U);
+
+    return (uint8_t)(I2Cx->DR);
 }
