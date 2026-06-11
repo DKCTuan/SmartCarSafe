@@ -5,46 +5,53 @@ static Car_Actuator_Config_t hw_config;
 
 /* Hàm cấu hình một chân bất kỳ sang output đẩy-kéo (push-pull) */
 static void Init_Output_Pin(GPIO_TypeDef *GPIOx, uint8_t pin) {
-    /* Bật clock */
-    if      (GPIOx == GPIOA) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; }
-    else if (GPIOx == GPIOB) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; }
-    else if (GPIOx == GPIOC) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; }
+    /* Bật clock tương ứng cho port */
+    switch ((uint32_t)GPIOx) {
+        case (uint32_t)GPIOA: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; break;
+        case (uint32_t)GPIOB: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; break;
+        case (uint32_t)GPIOC: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; break;
+    }
 
-    /* Cấu hình moder: chuyển về 01 (output) */
-    GPIOx->MODER &= ~(3U << (pin * 2));
-    GPIOx->MODER |=  (1U << (pin * 2));
+    /* Tính toán vị trí bit */
+    uint8_t bit_pos = pin << 1;
 
-    /* Cấu hình otyper: push-pull (0) */
-    GPIOx->OTYPER &= ~(1U << pin);
+    /* Cấu hình moder: xóa 2 bit cũ và ghi 01 để đưa vào chế độ output */
+    GPIOx->MODER &= ~(0b11 << bit_pos);
+    GPIOx->MODER |=  (0b01 << bit_pos);
 
-    /* Cấu hình ospeedr: high speed (10) */
-    GPIOx->OSPEEDR &= ~(3U << (pin * 2));
-    GPIOx->OSPEEDR |=  (2U << (pin * 2));
+    /* Cấu hình otyper: ghi 0 để chọn kiểu xuất push-pull */
+    GPIOx->OTYPER &= ~(0b1 << pin);
 
-    /* Cấu hình pupdr: no pull (00) */
-    GPIOx->PUPDR &= ~(3U << (pin * 2));
+    /* Cấu hình ospeedr: ghi 10 để chọn tốc độ high speed */
+    GPIOx->OSPEEDR &= ~(0b11 << bit_pos);
+    GPIOx->OSPEEDR |=  (0b10 << bit_pos);
+
+    /* Cấu hình pupdr: xóa 2 bit về 00 để chọn no pull-up/pull-down */
+    GPIOx->PUPDR &= ~(0b11 << bit_pos);
 }
 
 /* Hàm cấu hình một chân bất kỳ sang alternate function (PWM) */
 static void Init_AF_Pin(GPIO_TypeDef *GPIOx, uint8_t pin, uint8_t af_num) {
-    /* Bật clock */
-    if      (GPIOx == GPIOA) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; }
-    else if (GPIOx == GPIOB) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; }
-    else if (GPIOx == GPIOC) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; }
-
-    /* Cấu hình moder: chuyển về 10 (alternate function) */
-    GPIOx->MODER &= ~(3U << (pin * 2));
-    GPIOx->MODER |=  (2U << (pin * 2));
-
-    /* Cấu hình AFR (chọn đúng luồng tín hiệu timer) */
-    if (pin < 8) {
-        GPIOx->AFR[0] &= ~(15U << (pin * 4));
-        GPIOx->AFR[0] |=  (af_num << (pin * 4));
-    } else {
-        uint8_t pin_high = pin - 8;
-        GPIOx->AFR[1] &= ~(15U << (pin_high * 4));
-        GPIOx->AFR[1] |=  (af_num << (pin_high * 4));
+    /* Bật clock tương ứng cho port */
+    switch ((uint32_t)GPIOx) {
+        case (uint32_t)GPIOA: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; break;
+        case (uint32_t)GPIOB: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; break;
+        case (uint32_t)GPIOC: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; break;
     }
+
+    /* Cấu hình moder: ghi 10 để chọn chế độ alternate function */
+    uint8_t moder_pos = pin << 1;
+    GPIOx->MODER &= ~(0b11 << moder_pos);
+    GPIOx->MODER |=  (0b10 << moder_pos);
+
+    /* Tính toán vị trí thanh ghi AFR bằng thuật toán chia mảng */
+    uint8_t afr_index = pin / 8;     /* Chọn thanh ghi AFR[0] hoặc AFR[1] */
+    uint8_t afr_pin   = pin % 8;     /* Tính số thứ tự chân tương đối (0-7) */
+    uint8_t afr_pos   = afr_pin << 2; /* Mỗi chân chiếm 4 bit dịch */
+
+    /* Xóa 4 bit cũ và nạp mã chức năng thay thế (af_num) tương ứng của timer */
+    GPIOx->AFR[afr_index] &= ~(0b1111 << afr_pos);
+    GPIOx->AFR[afr_index] |=  (af_num << afr_pos);
 }
 
 /* Hàm khởi tạo cấu hình timer và các chân liên quan dựa trên cấu hình từ main.c */

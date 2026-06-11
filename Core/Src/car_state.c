@@ -12,16 +12,21 @@ static uint32_t last_debounce_time[CAR_SIGNAL_MAX] = {0, 0, 0}; /* Mốc thời 
 /* Hàm cấu hình một chân bất kỳ sang input pull-up */
 static void Init_Input_Pullup_Pin(GPIO_TypeDef *GPIOx, uint8_t pin) {
     /* Bật clock tương ứng cho port */
-    if      (GPIOx == GPIOA) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; }
-    else if (GPIOx == GPIOB) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; }
-    else if (GPIOx == GPIOC) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; }
+    switch ((uint32_t)GPIOx) {
+        case (uint32_t)GPIOA: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; break;
+        case (uint32_t)GPIOB: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; break;
+        case (uint32_t)GPIOC: RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; break;
+    }
 
-    /* Cấu hình moder: chuyển về 00 (input) */
-    GPIOx->MODER &= ~(3U << (pin * 2));
+    /* Tính toán vị trí bit bằng phép dịch trái để tối ưu tốc độ xử lý */
+    uint8_t bit_pos = pin << 1;
 
-    /* Cấu hình pull-up: xóa cũ, ghi 01 (pull-up) */
-    GPIOx->PUPDR &= ~(3U << (pin * 2));
-    GPIOx->PUPDR |=  (1U << (pin * 2));
+    /* Cấu hình moder: xóa 2 bit về 00 để đưa vào chế độ input */
+    GPIOx->MODER &= ~(0b11 << bit_pos);
+
+    /* Cấu hình pupdr: xóa 2 bit cũ và ghi 01 để bật điện trở kéo lên */
+    GPIOx->PUPDR &= ~(0b11 << bit_pos);
+    GPIOx->PUPDR |=  (0b01 << bit_pos);
 }
 
 /* Hàm cấu hình chân bất kỳ về trạng thái analog mode */
