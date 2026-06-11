@@ -121,6 +121,7 @@ int main(void)
 				LD2_Pin,
 				GPIO_PIN_SET
     	    	);
+    	    HAL_Delay(1500);
     	 }
     	 else
     	 {
