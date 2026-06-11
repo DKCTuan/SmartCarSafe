@@ -19,7 +19,7 @@
 extern volatile uint32_t g_tick_ms;
 
 /**
- * @brief  Configures SysTick for 1ms interrupt (bare-metal only).
+ * @brief  Configures SysTick for 1ms interrupt.
  *         No-op when USE_HAL_DRIVER is defined — HAL_Init() handles it.
  * @param  cpu_freq_hz  CPU frequency in Hz. Pass SystemCoreClock.
  */
