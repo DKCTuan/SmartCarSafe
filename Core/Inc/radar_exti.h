@@ -1,60 +1,48 @@
 /**
  * @file    radar_exti.h
  * @author  Mem 2
- * @brief   Driver for RCWL-0516 Radar sensor using EXTI1 (PA1) and bare-metal registers.
+ * @brief   Driver for RCWL-0516 Radar sensor using EXTI1 (PA1), bare-metal registers.
  * @date    2026
  */
-
 #ifndef RADAR_EXTI_H
 #define RADAR_EXTI_H
 
 #include "stm32f4xx.h"
 #include <stdint.h>
+#include "sys_timer.h"
 
 /* ------------------------------------------------------------------ */
-/* Macro Definitions                                                 */
+/* Hardware Pin Definitions - Edit ONLY here to remap to another pin  */
 /* ------------------------------------------------------------------ */
-#define RADAR_PRESENCE   1U   /**< Motion detected and validated */
-#define RADAR_ABSENCE    0U   /**< No motion detected */
+#define RADAR_GPIO_PORT     GPIOA
+#define RADAR_GPIO_CLK_BIT  0U      /**< AHB1ENR bit: 0=GPIOA, 1=GPIOB, 2=GPIOC */
+#define RADAR_PIN           1U      /**< GPIO pin number */
+#define RADAR_EXTI_IRQn     EXTI1_IRQn
 
 /* ------------------------------------------------------------------ */
-/* External Global Variables                                         */
+/* Return Value Definitions                                            */
 /* ------------------------------------------------------------------ */
-/**
- * @brief Global system tick counter (incremented every 1ms in SysTick_Handler).
- * Shared across all modules for non-blocking timing.
- */
-extern volatile uint32_t g_tick_ms;
+#define RADAR_PRESENCE      1U      /**< Motion detected and validated */
+#define RADAR_ABSENCE       0U      /**< No motion detected            */
 
 /* ------------------------------------------------------------------ */
-/* Function Prototypes                                               */
+/* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
-/**
- * @brief  Initializes GPIOA Pin 1 as Input Pull-Down and configures EXTI1.
- * Sets up NVIC with priority 2 for external interrupt handling.
- * @note   This function uses direct register access (bare-metal).
- */
-void Radar_EXTI_Init(void);
+/** @brief Initializes GPIO and EXTI for the radar sensor. */
+void    Radar_EXTI_Init(void);
 
-/**
- * @brief  ISR Callback function executed when an EXTI1 trigger occurs.
- * Sets the raw trigger flag to acknowledge motion detection.
- */
-void Radar_EXTI_Callback(void);
+/** @brief ISR callback. Call inside EXTI1_IRQHandler only. */
+void    Radar_EXTI_Callback(void);
 
 /**
- * @brief  Processes the raw radar trigger using a time filter and a hold timer.
- * @retval RADAR_PRESENCE if motion is validated (sustained >= 60ms),
- * RADAR_ABSENCE if no motion or noise detected.
- * @note   Must be polled frequently (every 10-50ms) in the main loop.
+ * @brief  Time-filtered presence detection.
+ * @retval RADAR_PRESENCE or RADAR_ABSENCE.
+ * @note   Poll every 10-50ms in STATE_SCANNING for accurate results.
  */
 uint8_t Radar_Is_Detected(void);
 
-/**
- * @brief  Resets all internal filter flags and timer states.
- * Should be called when transitioning back to IDLE state.
- */
-void Radar_ClearPresence(void);
+/** @brief Resets all internal states. Call when entering STATE_IDLE. */
+void    Radar_ClearPresence(void);
 
 #endif /* RADAR_EXTI_H */
