@@ -43,24 +43,27 @@ static void Radar_GPIO_Init(void)
 /* ------------------------------------------------------------------ */
 void Radar_EXTI_Init(void)
 {
-    /* Step 1: Configure GPIO pin */
-    Radar_GPIO_Init();
+	/* Step 1: Configure GPIO pin */
+	Radar_GPIO_Init();
 
-    /* Step 2: Enable SYSCFG clock for EXTI line mapping */
-    RCC->APB2ENR |= (1U << 14);
+	/* Step 2: Enable SYSCFG clock for EXTI line mapping */
+	RCC->APB2ENR |= (1U << 14);
 
-    /* Step 3: Map EXTI line to radar GPIO port (Port A = 0000) */
-    SYSCFG->EXTICR[RADAR_PIN / 4] &= ~(15U << ((RADAR_PIN % 4) * 4));
+	/* Step 3: Map EXTI line to radar GPIO port */
+	/* Clear 4 bits mapping for this pin first */
+	SYSCFG->EXTICR[RADAR_PIN / 4] &= ~(15U << ((RADAR_PIN % 4) * 4));
+	/* Write the actual port source code (0=PA, 1=PB, 2=PC) */
+	SYSCFG->EXTICR[RADAR_PIN / 4] |=  (RADAR_EXTI_PORT_SRC << ((RADAR_PIN % 4) * 4));
 
-    /* Step 4: Configure EXTI line */
-    EXTI->IMR  |=  (1U << RADAR_PIN);  /* Unmask interrupt line      */
-    EXTI->RTSR |=  (1U << RADAR_PIN);  /* Trigger on Rising edge only */
-    EXTI->FTSR &= ~(1U << RADAR_PIN);  /* Disable Falling edge        */
-    EXTI->PR    =  (1U << RADAR_PIN);  /* Clear any stale pending flag */
+	/* Step 4: Configure EXTI line */
+	EXTI->IMR  |=  (1U << RADAR_PIN);  /* Unmask interrupt line       */
+	EXTI->RTSR |=  (1U << RADAR_PIN);  /* Trigger on Rising edge only */
+	EXTI->FTSR &= ~(1U << RADAR_PIN);  /* Disable Falling edge        */
+	EXTI->PR    =  (1U << RADAR_PIN);  /* Clear any stale pending flag */
 
-    /* Step 5: Configure NVIC */
-    NVIC_SetPriority(RADAR_EXTI_IRQn, 2);
-    NVIC_EnableIRQ(RADAR_EXTI_IRQn);
+	/* Step 5: Configure NVIC */
+	NVIC_SetPriority(RADAR_EXTI_IRQn, 2);
+	NVIC_EnableIRQ(RADAR_EXTI_IRQn);
 }
 
 /* ------------------------------------------------------------------ */

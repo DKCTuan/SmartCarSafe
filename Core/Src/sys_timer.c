@@ -21,7 +21,7 @@ void SysTimer_Init(uint32_t cpu_freq_hz)
      * Bare-metal project: No HAL present, configure SysTick manually.
      * Generates a 1ms interrupt using the provided CPU frequency.
      */
-    SysTick_Config(cpu_freq_hz / 1000U);
+    SysTick_Config(cpu_freq_hz / 1000U); //16MHz
 #endif
 }
 

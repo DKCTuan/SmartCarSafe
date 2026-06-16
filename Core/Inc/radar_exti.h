@@ -13,10 +13,19 @@
 
 /* ------------------------------------------------------------------ */
 /* Hardware Pin Definitions - Edit ONLY here to remap to another pin  */
+/* */
+/* !!! WARNING: IF YOU CHANGE RADAR_PIN, YOU MUST ALSO:               */
+/* 1. Rename ISR in stm32f4xx_it.c to match STM32 Vector Table:     */
+/* - Pins 0 to 4:   EXTI0_IRQHandler -> EXTI4_IRQHandler         */
+/* - Pins 5 to 9:   EXTI9_5_IRQHandler                           */
+/* - Pins 10 to 15: EXTI15_10_IRQHandler                         */
+/* 2. Update RADAR_EXTI_IRQn below to match the pin group           */
+/* 3. Update RADAR_EXTI_PORT_SRC if shifting to a different PORT    */
 /* ------------------------------------------------------------------ */
 #define RADAR_GPIO_PORT     GPIOA
 #define RADAR_GPIO_CLK_BIT  0U      /**< AHB1ENR bit: 0=GPIOA, 1=GPIOB, 2=GPIOC */
-#define RADAR_PIN           1U      /**< GPIO pin number */
+#define RADAR_EXTI_PORT_SRC   0U      /**< SYSCFG EXTICR code: 0=PA, 1=PB, 2=PC   */
+#define RADAR_PIN           1U      /**< GPIO pin number (PA1) */
 #define RADAR_EXTI_IRQn     EXTI1_IRQn
 
 /* ------------------------------------------------------------------ */
