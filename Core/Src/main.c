@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "dev_sound_analog.h"
+#include "radar_exti.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -103,37 +104,28 @@ int main(void)
 
     /* Đặt ngưỡng cảnh báo */
     Sound_SetThreshold(2500U);
+
+    /* --- KHU VỰC CỦA TRỌNG --- */
+    SysTimer_Init(SystemCoreClock);
+    Radar_EXTI_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1)
     {
-    /* Đọc ADC và xử lý bộ lọc */
-    	Sound_Process();
+        Sound_Process();
 
-    	/* Kiểm tra trạng thái âm thanh */
-    	if (Sound_IsDetected() == 1U)
-    	{
-    		/* Có âm thanh bất thường */
-    	    HAL_GPIO_WritePin(
-    	    	LD2_GPIO_Port,
-				LD2_Pin,
-				GPIO_PIN_SET
-    	    	);
-    	    HAL_Delay(1500);
-    	 }
-    	 else
-    	 {
-    	    /* Không phát hiện âm thanh */
-    	    HAL_GPIO_WritePin(
-    	        LD2_GPIO_Port,
-    	        LD2_Pin,
-    	        GPIO_PIN_RESET
-    	        );
-    	 }
-      /* USER CODE END WHILE */
-      /* USER CODE BEGIN 3 */
+        if (Radar_Is_Detected() == RADAR_PRESENCE)
+        {
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+        }
+        else
+        {
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+        }
+
+        HAL_Delay(5);
     }
     /* USER CODE END 3 */
 }

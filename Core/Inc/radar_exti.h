@@ -45,4 +45,5 @@ uint8_t Radar_Is_Detected(void);
 /** @brief Resets all internal states. Call when entering STATE_IDLE. */
 void    Radar_ClearPresence(void);
 
+
 #endif /* RADAR_EXTI_H */
