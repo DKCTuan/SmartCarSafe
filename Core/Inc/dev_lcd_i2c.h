@@ -8,6 +8,7 @@
 #define DEV_LCD_I2C_H
 
 #include <stdint.h>
+#include "stm32f4xx.h"
 
 /**
  * @brief Địa chỉ I2C của module chuyển đổi PCF8574 (Gắn sau lưng LCD).
@@ -24,18 +25,18 @@ typedef enum {
 
 /**
  * @brief  Khởi tạo màn hình LCD 16x2.
- * @param  None
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C (VD: I2C1, I2C2).
  * @retval None
  */
-void LCD_Init(void);
+void LCD_Init(I2C_TypeDef *I2Cx);
 
 /**
  * @brief  Hiển thị trạng thái hệ thống và nhiệt độ lên màn hình LCD.
- * @param  state       Trạng thái hiện tại của Máy trạng thái (State Machine).
- * (Ví dụ: 0 = Bình thường, 1 = Phát hiện người, 2 = Nguy hiểm)
- * @param  temperature Giá trị nhiệt độ đo được (để in ra màn hình).
+ * @param  I2Cx:        Con trỏ tới ngoại vi I2C.
+ * @param  state:       Trạng thái hiện tại.
+ * @param  temperature: Giá trị nhiệt độ.
  * @retval None
  */
-void LCD_Display_Status(uint8_t state, float temperature);
+void LCD_Display_Status(I2C_TypeDef *I2Cx, uint8_t state, float temperature);
 
 #endif /* DEV_LCD_I2C_H */
