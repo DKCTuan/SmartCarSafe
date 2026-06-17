@@ -12,7 +12,15 @@
 /**
  * @brief Địa chỉ I2C của module chuyển đổi PCF8574 (Gắn sau lưng LCD).
  */
-#define LCD_I2C_ADDR
+
+typedef enum {
+    SYS_STATE_SAFE = 0,     // Trạng thái an toàn
+    SYS_STATE_WARNING,      // Trạng thái cảnh báo
+    SYS_STATE_DANGER,       // Trạng thái nguy hiểm
+    SYS_STATE_ERROR         // Trạng thái lỗi
+} System_State_t;
+
+#define LCD_I2C_ADDR 0x27
 
 /**
  * @brief  Khởi tạo màn hình LCD 16x2.
