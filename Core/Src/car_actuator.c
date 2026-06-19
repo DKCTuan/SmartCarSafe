@@ -3,6 +3,13 @@
 /* Biến lưu trữ cấu hình phần cứng do main.c truyền vào */
 static Car_Actuator_Config_t hw_config;
 
+/* Kiem tra cau hinh chan co hop le hay khong.
+ * Neu main.c khong khai bao servo that, port = 0 va driver bo qua TIM3_CH3.
+ */
+static uint8_t Is_Valid_Pin(GPIO_TypeDef *GPIOx, uint8_t pin) {
+    return ((GPIOx != (void *)0) && (pin < 16U)) ? 1U : 0U;
+}
+
 /* Hàm cấu hình một chân bất kỳ sang output đẩy-kéo (push-pull) */
 static void Init_Output_Pin(GPIO_TypeDef *GPIOx, uint8_t pin) {
     /* Bật clock tương ứng cho port */
@@ -66,7 +73,10 @@ void Car_Actuator_Init(Car_Actuator_Config_t *config) {
 
     /* 3. Cấu hình các chân băm xung PWM (alternate function) */
     Init_AF_Pin(hw_config.pwma.port, hw_config.pwma.pin, hw_config.pwma.af_num);
-    Init_AF_Pin(hw_config.servo.port, hw_config.servo.pin, hw_config.servo.af_num);
+    /* Chi cau hinh servo neu project co chan servo that trong pinout. */
+    if (Is_Valid_Pin(hw_config.servo.port, hw_config.servo.pin) != 0U) {
+        Init_AF_Pin(hw_config.servo.port, hw_config.servo.pin, hw_config.servo.af_num);
+    }
 
     /* 4. Cấu hình bộ định thời timer 3 tạo xung 50Hz (chu kỳ 20ms) */
     RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
@@ -81,10 +91,12 @@ void Car_Actuator_Init(Car_Actuator_Config_t *config) {
     TIM3->CCER  |= TIM_CCER_CC1E;
 
     /* Cấu hình kênh 3 (PWM1 mode) cho servo */
-    TIM3->CCMR2 &= ~TIM_CCMR2_OC3M;
-    TIM3->CCMR2 |= (6U << 4);
-    TIM3->CCMR2 |= TIM_CCMR2_OC3PE;
-    TIM3->CCER  |= TIM_CCER_CC3E;
+    if (Is_Valid_Pin(hw_config.servo.port, hw_config.servo.pin) != 0U) {
+        TIM3->CCMR2 &= ~TIM_CCMR2_OC3M;
+        TIM3->CCMR2 |= (6U << 4);
+        TIM3->CCMR2 |= TIM_CCMR2_OC3PE;
+        TIM3->CCER  |= TIM_CCER_CC3E;
+    }
 
     /* Bật bộ đếm và nạp cấu hình shadow */
     TIM3->CR1 |= TIM_CR1_CEN;
@@ -92,7 +104,9 @@ void Car_Actuator_Init(Car_Actuator_Config_t *config) {
 
     /* Đặt trạng thái ban đầu an toàn (tắt quạt, đóng kính) */
     TIM3->CCR1 = 0;
-    TIM3->CCR3 = 1000;
+    if (Is_Valid_Pin(hw_config.servo.port, hw_config.servo.pin) != 0U) {
+        TIM3->CCR3 = 1000;
+    }
 }
 
 /* Hàm điều khiển tốc độ quạt gió (0: Tắt, 1: Vừa, 2: Mạnh) */
@@ -131,6 +145,11 @@ void Actuator_Set_Fan_Speed(uint8_t speed_level) {
 
 /* Hàm điều khiển vị trí cửa kính bằng servo (0 - 90 độ) */
 void Actuator_Set_Window_Position(uint8_t angle) {
+    /* Khong lap servo thi ham nay khong lam gi, tranh ghi vao TIM3_CH3 vo nghia. */
+    if (Is_Valid_Pin(hw_config.servo.port, hw_config.servo.pin) == 0U) {
+        return;
+    }
+
     /* Giới hạn góc quay tối đa để bảo vệ cơ cấu servo (0 - 90 độ) */
     if (angle > 90) {
         angle = 90;

@@ -11,12 +11,13 @@
 #include <stdio.h>
 
 
-/* ĐỊA CHỈ GIAO TIẾP I2C (BẮT BUỘC DỊCH TRÁI 1 BIT ĐỂ CHỨA BIT R/W) */
+/* ĐỊA CHỈ GIAO TIẾP I2C (DỊCH TRÁI 1 BIT ĐỂ CHỨA BIT R/W) */
 #define BMP280_I2C_W_ADDR     (BMP280_ADDR << 1)       /* 0xEC (Ghi) */
 #define BMP280_I2C_R_ADDR     ((BMP280_ADDR << 1) | 1) /* 0xED (Đọc) */
 
 /* ĐỊA CHỈ CÁC THANH GHI QUAN TRỌNG TỪ DATASHEET CẢM BIẾN */
 #define BMP280_REG_ID         0xD0 /* Thanh ghi chứa mã định danh (Chip ID) */
+#define BMP280_REG_RESET      0xE0 /* Thanh ghi Reset cảm biến */
 #define BMP280_REG_CTRL_MEAS  0xF4 /* Thanh ghi điều khiển: Bật/tắt Sleep, độ phân giải */
 #define BMP280_REG_TEMP_MSB   0xFA /* Thanh ghi chứa byte cao nhất (MSB) của nhiệt độ */
 #define BMP280_REG_CALIB_T1   0x88 /* Địa chỉ bắt đầu khối ROM chứa hằng số bù nhiệt */
@@ -100,6 +101,15 @@ void BMP280_Init(I2C_TypeDef *I2Cx) {
      * Mã Hex tổng hợp: (0x01 << 5) | (0x00 << 2) | 0x03 = 0x23
      */
     BMP280_Write_Reg(I2Cx, BMP280_REG_CTRL_MEAS, 0x23);
+}
+
+/**
+ * @brief  Hủy khởi tạo cảm biến BMP280 (Đưa về Sleep mode hoặc Soft Reset)
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C đang kết nối với cảm biến
+ */
+void BMP280_DeInit(I2C_TypeDef *I2Cx) {
+    /* Gửi mã 0xB6 vào thanh ghi Reset để khôi phục toàn bộ cảm biến về mặc định */
+    BMP280_Write_Reg(I2Cx, BMP280_REG_RESET, 0xB6);
 }
 
 /**

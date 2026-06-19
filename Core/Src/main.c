@@ -21,18 +21,113 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "car_actuator.h"
+#include "car_state.h"
+#include "dev_bmp280.h"
+#include "dev_lcd_i2c.h"
 #include "dev_sound_analog.h"
+#include "hw_i2c.h"
 #include "radar_exti.h"
+#include "sys_timer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum
+{
+    /* IDLE: xe chua khoa hoac dang co nguoi/ACC, tat toan bo canh bao */
+    APP_STATE_IDLE = 0U,
 
+    /* ARMING: da khoa xe, doi on dinh trong vai giay truoc khi quet cabin */
+    APP_STATE_ARMING,
+
+    /* SCANNING: xe da khoa, lien tuc doc radar/am thanh/nhiet do */
+    APP_STATE_SCANNING,
+
+    /* ALARM: phat hien nguy co, bat coi va quat muc cao */
+    APP_STATE_ALARM
+} App_State_t;
+
+/* Anh chup trang thai dau vao da qua cac driver loc nhieu/debounce.
+ * Tang application chi xu ly logic, khong doc thanh ghi truc tiep o day.
+ */
+typedef struct
+{
+    uint8_t acc_on;
+    uint8_t door_open;
+    uint8_t locked;
+    uint8_t radar_present;
+    uint8_t sound_detected;
+    float   temperature_c;
+} Cabin_Input_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define APP_ARMING_TIME_MS          3000U
+#define APP_SENSOR_PERIOD_MS        20U
+#define APP_TEMP_PERIOD_MS          1000U
+#define APP_LCD_PERIOD_MS           500U
+#define APP_ALARM_RECHECK_MS        10000U
 
+#define TEMP_THRESHOLD_WARNING_C    35.0f
+#define TEMP_THRESHOLD_DANGER_C     40.0f
+#define SOUND_THRESHOLD_ADC         2500U
+
+/* Gia tri danh dau kenh chap hanh khong su dung.
+ * Bang pinout cua nhom khong co servo nen khong duoc gan them chan vat ly.
+ */
+#define ACTUATOR_UNUSED_PORT        ((GPIO_TypeDef *)0)
+
+/* Cum nut nhan gia lap tin hieu xe.
+ * Driver car_state cau hinh cac chan nay la GPIO input pull-up, active-low.
+ */
+#define CAR_ACC_PORT                GPIOC
+#define CAR_ACC_PIN                 0U
+#define CAR_DOOR_PORT               GPIOC
+#define CAR_DOOR_PIN                1U
+#define CAR_LOCK_PORT               GPIOC
+#define CAR_LOCK_PIN                2U
+
+/* KY-037 dung ngo ra analog AO dua vao ADC1 channel 0. */
+#define SOUND_PORT                  GPIOA
+#define SOUND_PIN                   0U
+#define SOUND_ADC_CHANNEL           0U
+
+/* BMP/BME280 dung rieng I2C1 tren PB8/PB9. */
+#define BMP_I2C_BUS                 I2C1
+#define BMP_I2C_SCL_PORT            GPIOB
+#define BMP_I2C_SCL_PIN             8U
+#define BMP_I2C_SDA_PORT            GPIOB
+#define BMP_I2C_SDA_PIN             9U
+#define BMP_I2C_SCL_AF              4U
+#define BMP_I2C_SDA_AF              4U
+
+/* LCD 16x2 qua PCF8574 dung rieng I2C2 tren PB10/PB11. */
+#define LCD_I2C_BUS                 I2C2
+#define LCD_I2C_SCL_PORT            GPIOB
+#define LCD_I2C_SCL_PIN             10U
+#define LCD_I2C_SDA_PORT            GPIOB
+#define LCD_I2C_SDA_PIN             3U
+#define LCD_I2C_SCL_AF              4U
+#define LCD_I2C_SDA_AF              9U
+
+/* TB6612FNG: PA6 xuat PWM TIM3_CH1, PA7/PB0 chon chieu, PB1 standby. */
+#define FAN_AIN1_PORT               GPIOA
+#define FAN_AIN1_PIN                7U
+#define FAN_AIN2_PORT               GPIOB
+#define FAN_AIN2_PIN                0U
+#define FAN_STBY_PORT               GPIOB
+#define FAN_STBY_PIN                1U
+#define FAN_PWM_PORT                GPIOA
+#define FAN_PWM_PIN                 6U
+#define SERVO_PWM_PORT              ACTUATOR_UNUSED_PORT
+#define SERVO_PWM_PIN               0U
+#define TIM3_AF                     2U
+
+/* Coi chip canh bao, muc 1 la bat. */
+#define BUZZER_PORT                 GPIOA
+#define BUZZER_PIN                  8U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,7 +139,13 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-Sound_Config_t soundSensor;
+static App_State_t   sg_app_state = APP_STATE_IDLE;
+static Cabin_Input_t sg_input = {0U, 0U, 0U, 0U, 0U, 28.0f};
+
+static uint32_t sg_state_tick = 0U;
+static uint32_t sg_last_sensor_tick = 0U;
+static uint32_t sg_last_temp_tick = 0U;
+static uint32_t sg_last_lcd_tick = 0U;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -52,12 +153,348 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void APP_Init(void);
+static void APP_Process(void);
+static void APP_ReadFastInputs(void);
+static void APP_ReadSlowInputs(void);
+static void APP_RunStateMachine(void);
+static void APP_UpdateOutputs(void);
+static void APP_UpdateDisplay(void);
+static uint8_t APP_IsArmedCondition(void);
+static uint8_t APP_ShouldAlarm(void);
+static uint8_t APP_LcdState(void);
+static void APP_Buzzer_Init(void);
+static void APP_Buzzer_Write(uint8_t on);
+static void APP_Led_Write(uint8_t on);
+static void APP_Led_TogglePattern(uint32_t period_ms);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void APP_Init(void)
+{
+    /* Bang cau hinh phan cung duoc nap vao cac driver rieng.
+     * Cach nay giu main.c la tang tich hop, con cau hinh thanh ghi nam trong driver.
+     */
+    Car_Pin_Config_t car_pins[CAR_SIGNAL_MAX] = {
+        {CAR_ACC_PORT,  CAR_ACC_PIN},
+        {CAR_DOOR_PORT, CAR_DOOR_PIN},
+        {CAR_LOCK_PORT, CAR_LOCK_PIN}
+    };
 
+    Sound_Config_t sound_config = {
+        .port = SOUND_PORT,
+        .pin = SOUND_PIN,
+        .adcChannel = SOUND_ADC_CHANNEL,
+        .adc = ADC1
+    };
+
+    Car_Actuator_Config_t actuator_config = {
+        .ain1 = {FAN_AIN1_PORT, FAN_AIN1_PIN},
+        .ain2 = {FAN_AIN2_PORT, FAN_AIN2_PIN},
+        .stby = {FAN_STBY_PORT, FAN_STBY_PIN},
+        .pwma = {FAN_PWM_PORT, FAN_PWM_PIN, TIM3_AF},
+
+        /* Project hien tai khong lap servo. Driver se bo qua kenh nay. */
+        .servo = {SERVO_PWM_PORT, SERVO_PWM_PIN, TIM3_AF}
+    };
+
+    SysTimer_Init(SystemCoreClock);
+    APP_Buzzer_Init();
+
+    Car_State_Init(car_pins);
+    Car_Actuator_Init(&actuator_config);
+
+    /* Khoi tao 2 bus I2C doc lap:
+     * - BMP/BME280 tren I2C1
+     * - LCD/PCF8574 tren I2C2
+     */
+    HW_GPIO_Init_I2C_Pin(BMP_I2C_SCL_PORT, BMP_I2C_SCL_PIN, BMP_I2C_SCL_AF);
+    HW_GPIO_Init_I2C_Pin(BMP_I2C_SDA_PORT, BMP_I2C_SDA_PIN, BMP_I2C_SDA_AF);
+    HW_I2C_Init(BMP_I2C_BUS);
+    BMP280_Init(BMP_I2C_BUS);
+
+    HW_GPIO_Init_I2C_Pin(LCD_I2C_SCL_PORT, LCD_I2C_SCL_PIN, LCD_I2C_SCL_AF);
+    HW_GPIO_Init_I2C_Pin(LCD_I2C_SDA_PORT, LCD_I2C_SDA_PIN, LCD_I2C_SDA_AF);
+    HW_I2C_Init(LCD_I2C_BUS);
+    LCD_Init(LCD_I2C_BUS);
+
+    Radar_EXTI_Init();
+    Sound_Init(&sound_config);
+    Sound_SetThreshold(SOUND_THRESHOLD_ADC);
+
+    Actuator_Set_Fan_Speed(0U);
+    APP_Buzzer_Write(0U);
+    APP_Led_Write(0U);
+
+    sg_state_tick = SysTimer_GetTick();
+}
+
+static void APP_Process(void)
+{
+    uint32_t now = SysTimer_GetTick();
+
+    /* Xu ly ADC am thanh cang thuong xuyen cang tot de bo loc moving average
+     * co mau moi, nhung khong dung delay/blocking trong vong lap chinh.
+     */
+    Sound_Process();
+
+    /* Nhom tin hieu nhanh: nut nhan, radar, am thanh va state machine. */
+    if ((now - sg_last_sensor_tick) >= APP_SENSOR_PERIOD_MS)
+    {
+        sg_last_sensor_tick = now;
+        APP_ReadFastInputs();
+        APP_RunStateMachine();
+        APP_UpdateOutputs();
+    }
+
+    /* Nhiet do/I2C doc cham hon de tranh chiem bus va lam tre vong quet nhanh. */
+    if ((now - sg_last_temp_tick) >= APP_TEMP_PERIOD_MS)
+    {
+        sg_last_temp_tick = now;
+        APP_ReadSlowInputs();
+    }
+
+    /* LCD cap nhat 500ms/lap de tranh nhap nhay va giam so lan clear man hinh. */
+    if ((now - sg_last_lcd_tick) >= APP_LCD_PERIOD_MS)
+    {
+        sg_last_lcd_tick = now;
+        APP_UpdateDisplay();
+    }
+}
+
+static void APP_ReadFastInputs(void)
+{
+    sg_input.acc_on = Car_Get_System_Status(CAR_ACC_SIGNAL);
+    sg_input.door_open = Car_Get_System_Status(CAR_DOOR_SIGNAL);
+    sg_input.locked = Car_Get_System_Status(CAR_LOCK_SIGNAL);
+    sg_input.radar_present = Radar_Is_Detected();
+    sg_input.sound_detected = Sound_IsDetected();
+}
+
+static void APP_ReadSlowInputs(void)
+{
+    sg_input.temperature_c = BMP280_Read_Temperature(BMP_I2C_BUS);
+}
+
+static void APP_RunStateMachine(void)
+{
+    uint32_t now = SysTimer_GetTick();
+
+    /* May trang thai tong the:
+     * IDLE -> ARMING -> SCANNING -> ALARM.
+     * Neu ACC bat, cua mo, hoac xe khong khoa thi quay ve IDLE ngay.
+     */
+    switch (sg_app_state)
+    {
+        case APP_STATE_IDLE:
+            if (APP_IsArmedCondition() != 0U)
+            {
+                sg_app_state = APP_STATE_ARMING;
+                sg_state_tick = now;
+                Radar_ClearPresence();
+            }
+            break;
+
+        case APP_STATE_ARMING:
+            if (APP_IsArmedCondition() == 0U)
+            {
+                sg_app_state = APP_STATE_IDLE;
+                sg_state_tick = now;
+            }
+            else if ((now - sg_state_tick) >= APP_ARMING_TIME_MS)
+            {
+                sg_app_state = APP_STATE_SCANNING;
+                sg_state_tick = now;
+            }
+            break;
+
+        case APP_STATE_SCANNING:
+            if (APP_IsArmedCondition() == 0U)
+            {
+                sg_app_state = APP_STATE_IDLE;
+                sg_state_tick = now;
+                Radar_ClearPresence();
+            }
+            else if (APP_ShouldAlarm() != 0U)
+            {
+                sg_app_state = APP_STATE_ALARM;
+                sg_state_tick = now;
+            }
+            break;
+
+        case APP_STATE_ALARM:
+            if (APP_IsArmedCondition() == 0U)
+            {
+                sg_app_state = APP_STATE_IDLE;
+                sg_state_tick = now;
+                Radar_ClearPresence();
+            }
+            else
+            {
+                /* Khi coi dang keu, radar co the bi nhieu/giu co.
+                 * Xoa latch radar trong ALARM de khong bi ket bao dong chi vi radar.
+                 */
+                Radar_ClearPresence();
+                sg_input.radar_present = RADAR_ABSENCE;
+
+                if ((now - sg_state_tick) >= APP_ALARM_RECHECK_MS)
+                {
+                    sg_state_tick = now;
+                    if (APP_ShouldAlarm() == 0U)
+                    {
+                        sg_app_state = APP_STATE_SCANNING;
+                    }
+                }
+            }
+            break;
+
+        default:
+            sg_app_state = APP_STATE_IDLE;
+            sg_state_tick = now;
+            break;
+    }
+}
+
+static void APP_UpdateOutputs(void)
+{
+    switch (sg_app_state)
+    {
+        case APP_STATE_IDLE:
+            Actuator_Set_Fan_Speed(0U);
+            APP_Buzzer_Write(0U);
+            APP_Led_Write(0U);
+            break;
+
+        case APP_STATE_ARMING:
+            Actuator_Set_Fan_Speed(0U);
+            APP_Buzzer_Write(0U);
+            APP_Led_TogglePattern(250U);
+            break;
+
+        case APP_STATE_SCANNING:
+            APP_Buzzer_Write(0U);
+            APP_Led_TogglePattern(1000U);
+
+            if (sg_input.temperature_c >= TEMP_THRESHOLD_WARNING_C)
+            {
+                Actuator_Set_Fan_Speed(1U);
+            }
+            else
+            {
+                Actuator_Set_Fan_Speed(0U);
+            }
+            break;
+
+        case APP_STATE_ALARM:
+            Actuator_Set_Fan_Speed(2U);
+            APP_Buzzer_Write(1U);
+            APP_Led_Write(1U);
+            break;
+
+        default:
+            break;
+    }
+}
+
+static void APP_UpdateDisplay(void)
+{
+    LCD_Display_Status(LCD_I2C_BUS, APP_LcdState(), sg_input.temperature_c);
+}
+
+static uint8_t APP_IsArmedCondition(void)
+{
+    /* Dieu kien bao ve: xe tat ACC, cua dong, va da khoa.
+     * Cac gia tri nay da duoc driver car_state doi tu active-low sang logic 1/0.
+     */
+    return ((sg_input.acc_on == 0U) &&
+            (sg_input.door_open == 0U) &&
+            (sg_input.locked != 0U)) ? 1U : 0U;
+}
+
+static uint8_t APP_ShouldAlarm(void)
+{
+    /* Nhiet do nguy hiem hoac tieng keu lon duoc phep kich ALARM doc lap.
+     * Radar ket hop voi nhiet do canh bao de giam false positive khi chi co chuyen dong.
+     */
+    if (sg_input.temperature_c >= TEMP_THRESHOLD_DANGER_C)
+    {
+        return 1U;
+    }
+
+    if (sg_input.sound_detected != 0U)
+    {
+        return 1U;
+    }
+
+    if ((sg_input.radar_present == RADAR_PRESENCE) &&
+        (sg_input.temperature_c >= TEMP_THRESHOLD_WARNING_C))
+    {
+        return 1U;
+    }
+
+    return 0U;
+}
+
+static uint8_t APP_LcdState(void)
+{
+    if (sg_app_state == APP_STATE_ALARM)
+    {
+        return SYS_STATE_DANGER;
+    }
+
+    if ((sg_app_state == APP_STATE_ARMING) ||
+        (sg_input.temperature_c >= TEMP_THRESHOLD_WARNING_C) ||
+        (sg_input.radar_present == RADAR_PRESENCE) ||
+        (sg_input.sound_detected != 0U))
+    {
+        return SYS_STATE_WARNING;
+    }
+
+    return SYS_STATE_SAFE;
+}
+
+static void APP_Buzzer_Init(void)
+{
+    /* Cau hinh PA8 bang thanh ghi truc tiep: output push-pull, no pull. */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+    BUZZER_PORT->MODER &= ~(3U << (BUZZER_PIN * 2U));
+    BUZZER_PORT->MODER |=  (1U << (BUZZER_PIN * 2U));
+    BUZZER_PORT->OTYPER &= ~(1U << BUZZER_PIN);
+    BUZZER_PORT->PUPDR &= ~(3U << (BUZZER_PIN * 2U));
+    BUZZER_PORT->OSPEEDR &= ~(3U << (BUZZER_PIN * 2U));
+    BUZZER_PORT->ODR &= ~(1U << BUZZER_PIN);
+}
+
+static void APP_Buzzer_Write(uint8_t on)
+{
+    if (on != 0U)
+    {
+        BUZZER_PORT->ODR |= (1U << BUZZER_PIN);
+    }
+    else
+    {
+        BUZZER_PORT->ODR &= ~(1U << BUZZER_PIN);
+    }
+}
+
+static void APP_Led_Write(uint8_t on)
+{
+    if (on != 0U)
+    {
+        LD2_GPIO_Port->ODR |= LD2_Pin;
+    }
+    else
+    {
+        LD2_GPIO_Port->ODR &= ~LD2_Pin;
+    }
+}
+
+static void APP_Led_TogglePattern(uint32_t period_ms)
+{
+    uint32_t phase = (SysTimer_GetTick() / period_ms) & 1U;
+    APP_Led_Write((uint8_t)(phase != 0U));
+}
 /* USER CODE END 0 */
 
 /**
@@ -92,40 +529,14 @@ int main(void)
     MX_GPIO_Init();
     MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-    /* Cấu hình cảm biến âm thanh KY-037
-     * PA0 -> ADC Channel 0
-     */
-    soundSensor.port = GPIOA;
-    soundSensor.pin = 0U;
-    soundSensor.adcChannel = 0U;
-    soundSensor.adc = ADC1;
-    /* Khởi tạo driver âm thanh */
-    Sound_Init(&soundSensor);
-
-    /* Đặt ngưỡng cảnh báo */
-    Sound_SetThreshold(2500U);
-
-    /* --- KHU VỰC CỦA TRỌNG --- */
-    SysTimer_Init(SystemCoreClock);
-    Radar_EXTI_Init();
+    APP_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1)
     {
-        Sound_Process();
-
-        if (Radar_Is_Detected() == RADAR_PRESENCE)
-        {
-            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-        }
-        else
-        {
-            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-        }
-
-        HAL_Delay(5);
+        APP_Process();
     }
     /* USER CODE END 3 */
 }

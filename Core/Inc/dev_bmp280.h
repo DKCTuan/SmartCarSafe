@@ -21,6 +21,12 @@
 void BMP280_Init(I2C_TypeDef *I2Cx);
 
 /**
+ * @brief  Hủy khởi tạo cảm biến BMP280 (Đưa về Sleep mode hoặc Soft Reset)
+ * @param  I2Cx: Con trỏ tới ngoại vi I2C đang kết nối với cảm biến
+ */
+void BMP280_DeInit(I2C_TypeDef *I2Cx);
+
+/**
  * @brief  Đọc dữ liệu thô và tính toán ra nhiệt độ thực tế
  * @param  I2Cx: Con trỏ tới ngoại vi I2C đang kết nối với cảm biến
  * @retval Nhiệt độ đã tính toán.

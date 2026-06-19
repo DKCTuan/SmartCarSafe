@@ -9,22 +9,33 @@
 
 /**
  * @brief  Cấu hình một chân GPIO bất kỳ sang chế độ I2C (AF, Open-Drain, Pull-up).
- * @param  GPIOx:  Con trỏ tới Port chứa chân đó (VD: GPIOA, GPIOB).
+ * @param  GPIOx:  Con trỏ tới Port chứa chân đó.
  * @param  pin:    Số thứ tự chân (0 - 15).
  * @param  af_num: Mã Alternate Function (VD: 4 hoặc 9 cho I2C).
  * @retval None
  */
 void HW_GPIO_Init_I2C_Pin(GPIO_TypeDef *GPIOx, uint8_t pin, uint8_t af_num) {
-    /* 1. Kích hoạt Clock cho Port GPIO tương ứng một cách tự động */
-    if      (GPIOx == GPIOA) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; }
-    else if (GPIOx == GPIOB) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; }
-    else if (GPIOx == GPIOC) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; }
+	/* 1. Kích hoạt Clock cho Port GPIO tương ứng một cách tự động */
+	switch ((uint32_t)GPIOx) {
+		case GPIOA_BASE:
+			RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+			break;
+		case GPIOB_BASE:
+			RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+			break;
+		case GPIOC_BASE:
+			RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+			break;
+		default:
+			/* Nếu truyền vào Port không được hỗ trợ, bỏ qua */
+			break;
+	}
 
     /* 2. Cấu hình Moder: Chuyển sang Alternate Function */
     GPIOx->MODER &= ~(3U << (pin * 2));
     GPIOx->MODER |=  (2U << (pin * 2));
 
-    /* 3. Cấu hình Output Type: Open-Drai */
+    /* 3. Cấu hình Output Type: Open-Drain */
     GPIOx->OTYPER |= (1U << pin);
 
     /* 4. Cấu hình Pull-up */
@@ -50,10 +61,21 @@ void HW_GPIO_Init_I2C_Pin(GPIO_TypeDef *GPIOx, uint8_t pin, uint8_t af_num) {
  * @retval None
  */
 void HW_I2C_Init(I2C_TypeDef *I2Cx) {
-    /* 1. Kích hoạt Clock cho bộ I2C được truyền vào */
-    if      (I2Cx == I2C1) { RCC->APB1ENR |= RCC_APB1ENR_I2C1EN; }
-    else if (I2Cx == I2C2) { RCC->APB1ENR |= RCC_APB1ENR_I2C2EN; }
-    else if (I2Cx == I2C3) { RCC->APB1ENR |= RCC_APB1ENR_I2C3EN; }
+	/* 1. Kích hoạt Clock cho bộ I2C được truyền vào */
+	switch ((uint32_t)I2Cx) {
+		case I2C1_BASE:
+			RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+			break;
+		case I2C2_BASE:
+			RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
+			break;
+		case I2C3_BASE:
+			RCC->APB1ENR |= RCC_APB1ENR_I2C3EN;
+			break;
+		default:
+			/* Nếu truyền vào ngoại vi không hợp lệ, bỏ qua */
+			break;
+	}
 
     /* 2. Khởi động lại */
     I2Cx->CR1 |= I2C_CR1_SWRST;
