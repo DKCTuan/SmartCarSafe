@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "car_actuator.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,7 +43,13 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+Car_Actuator_Config_t my_output_hardware = {
+    .ain1  = {GPIOA, 7},     /* Chân AIN1 nối PA7 */
+    .ain2  = {GPIOB, 0},     /* Chân AIN2 nối PB0 */
+    .stby  = {GPIOB, 1},     /* Chân STBY nối PB1 */
+    .pwma  = {GPIOA, 6, 2},  /* Chân PWMA nối PA6, mã AF là 2 (Timer 3) */
+    .servo = {GPIOC, 8, 2}   /* Chân Servo nối PC8 (Cứ khai báo dù chưa nối mạch) */
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,12 +97,25 @@ int main(void)
     MX_GPIO_Init();
     MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+    /* Gọi hàm khởi tạo cấu hình phần cứng của module Actuator */
+      Car_Actuator_Init(&my_output_hardware);
   /* USER CODE END 2 */
 
   /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1)
     {
+    	/* 1. Kích quạt chạy mức 1 (Duty cycle 50%) */
+    	      Actuator_Set_Fan_Speed(1);
+    	      HAL_Delay(3000); /* Cho quạt chạy trong 3 giây */
+
+    	      /* 2. Kích quạt chạy mức 2 (Duty cycle 100%) */
+    	      Actuator_Set_Fan_Speed(2);
+    	      HAL_Delay(3000); /* Cho quạt quay max tốc độ 3 giây */
+
+    	      /* 3. Tắt quạt hoàn toàn (Duty cycle 0%) */
+    	      Actuator_Set_Fan_Speed(0);
+    	      HAL_Delay(3000); /* Đợi quạt dừng hẳn trong 3 giây rồi lặp lại */
       /* USER CODE END WHILE */
 
       /* USER CODE BEGIN 3 */
