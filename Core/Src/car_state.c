@@ -1,4 +1,5 @@
 #include "car_state.h"
+#include "sys_timer.h"
 
 /* Mảng lưu trữ cấu hình chân được nạp từ hàm init */
 static Car_Pin_Config_t signal_pins[CAR_SIGNAL_MAX];
@@ -86,13 +87,14 @@ uint8_t Car_Get_System_Status(Car_Signal_Type_t signal_type) {
     }
 
     /* Thuật toán lọc nhiễu (debounce) non-blocking */
+    uint32_t current_time = SysTimer_GetTick();
     if (raw_read != last_pin_states[index]) {
         /* Nếu có sự thay đổi điện áp, cập nhật lại mốc thời gian đếm */
-        last_debounce_time[index] = HAL_GetTick();
+        last_debounce_time[index] = current_time;
     }
 
     /* Nếu tín hiệu giữ ổn định qua mức thời gian quy định (50ms) */
-    if ((HAL_GetTick() - last_debounce_time[index]) > DEBOUNCE_TIME_MS) {
+    if ((current_time - last_debounce_time[index]) > DEBOUNCE_TIME_MS) {
         stable_pin_states[index] = raw_read; /* Chốt trạng thái an toàn */
     }
 
