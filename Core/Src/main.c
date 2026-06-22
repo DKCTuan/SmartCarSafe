@@ -279,19 +279,20 @@ static void APP_Process(void)
 static void APP_ReadFastInputs(void)
 {
     /* TẠM THỜI: Đọc trực tiếp nút bấm B1 (PC13) có sẵn trên kit Nucleo */
-    uint8_t b1_status = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
 
     /* ÉP LOGIC:
      * - Khi NHẤN GIỮ nút B1 (b1_status == 0): Coi như xe ĐÃ KHÓA (locked = 1U)
      * - Khi THẢ nút B1 (b1_status == 1): Coi như xe MỞ KHÓA (locked = 0U)
      */
-    sg_input.locked = (b1_status == GPIO_PIN_RESET) ? 1U : 0U;
 
     /* Các tín hiệu giả lập khác ép bằng 0 để không bị vướng điều kiện */
     sg_input.acc_on = 0U;     // Giả lập xe luôn tắt máy
     sg_input.door_open = 0U;   // Giả lập cửa luôn đóng
 
     /* Đọc dữ liệu từ các cảm biến (Giữ nguyên) */
+    sg_input.acc_on = Car_Get_System_Status(CAR_ACC_SIGNAL);
+    sg_input.door_open = Car_Get_System_Status(CAR_DOOR_SIGNAL);
+    sg_input.locked = Car_Get_System_Status(CAR_LOCK_SIGNAL);
     sg_input.radar_present = Radar_Is_Detected();
     sg_input.sound_detected = Sound_IsDetected();
     if (((sg_app_state == APP_STATE_SCANNING) ||
