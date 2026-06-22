@@ -69,10 +69,11 @@ typedef struct
 #define APP_TEMP_PERIOD_MS          1000U
 #define APP_LCD_PERIOD_MS           2000U
 #define APP_ALARM_RECHECK_MS        10000U
+#define APP_SOUND_INDICATOR_HOLD_MS 2000U
 
 #define TEMP_THRESHOLD_WARNING_C    25.0f
-#define TEMP_THRESHOLD_DANGER_C     30.0f
-#define SOUND_THRESHOLD_ADC         2500U
+#define TEMP_THRESHOLD_DANGER_C     32.0f
+#define SOUND_THRESHOLD_ADC         180U
 
 /* Gia tri danh dau kenh chap hanh khong su dung.
  * Bang pinout cua nhom khong co servo nen khong duoc gan them chan vat ly.
@@ -128,6 +129,10 @@ typedef struct
 /* Coi chip canh bao, muc 1 la bat. */
 #define BUZZER_PORT                 GPIOA
 #define BUZZER_PIN                  8U
+
+/* LED rieng bao am thanh vuot nguong. Mac dinh cam LED ngoai vao PB4. */
+#define SOUND_LED_PORT              GPIOB
+#define SOUND_LED_PIN               4U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -146,6 +151,7 @@ static uint32_t sg_state_tick = 0U;
 static uint32_t sg_last_sensor_tick = 0U;
 static uint32_t sg_last_temp_tick = 0U;
 static uint32_t sg_last_lcd_tick = 0U;
+static uint32_t sg_last_sound_tick = 0U;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -163,8 +169,11 @@ static void APP_UpdateDisplay(void);
 static uint8_t APP_IsArmedCondition(void);
 static uint8_t APP_ShouldAlarm(void);
 static uint8_t APP_LcdState(void);
+static uint8_t APP_IsSoundIndicatorActive(void);
 static void APP_Buzzer_Init(void);
 static void APP_Buzzer_Write(uint8_t on);
+static void APP_SoundLed_Init(void);
+static void APP_SoundLed_Write(uint8_t on);
 static void APP_Led_Write(uint8_t on);
 static void APP_Led_TogglePattern(uint32_t period_ms);
 
@@ -203,6 +212,7 @@ static void APP_Init(void)
 
     SysTimer_Init(SystemCoreClock);
     APP_Buzzer_Init();
+    APP_SoundLed_Init();
 
     Car_State_Init(car_pins);
     Car_Actuator_Init(&actuator_config);
@@ -228,6 +238,7 @@ static void APP_Init(void)
     Actuator_Set_Fan_Speed(0U);
     APP_Buzzer_Write(0U);
     APP_Led_Write(0U);
+    APP_SoundLed_Write(0U);
 
     sg_state_tick = SysTimer_GetTick();
 }
@@ -283,6 +294,12 @@ static void APP_ReadFastInputs(void)
     /* Đọc dữ liệu từ các cảm biến (Giữ nguyên) */
     sg_input.radar_present = Radar_Is_Detected();
     sg_input.sound_detected = Sound_IsDetected();
+    if (((sg_app_state == APP_STATE_SCANNING) ||
+         (sg_app_state == APP_STATE_ALARM)) &&
+        (sg_input.sound_detected != 0U))
+    {
+        sg_last_sound_tick = SysTimer_GetTick();
+    }
 }
 
 static void APP_ReadSlowInputs(void)
@@ -408,6 +425,16 @@ static void APP_UpdateOutputs(void)
         default:
             break;
     }
+
+    if ((sg_app_state == APP_STATE_SCANNING) ||
+        (sg_app_state == APP_STATE_ALARM))
+    {
+        APP_SoundLed_Write(APP_IsSoundIndicatorActive());
+    }
+    else
+    {
+        APP_SoundLed_Write(0U);
+    }
 }
 
 static void APP_UpdateDisplay(void)
@@ -456,15 +483,32 @@ static uint8_t APP_LcdState(void)
         return SYS_STATE_DANGER;
     }
 
-    if ((sg_app_state == APP_STATE_ARMING) ||
-        (sg_input.temperature_c >= TEMP_THRESHOLD_WARNING_C) ||
-        (sg_input.radar_present == RADAR_PRESENCE) ||
-        (sg_input.sound_detected != 0U))
+    if (sg_app_state == APP_STATE_ARMING)
     {
         return SYS_STATE_WARNING;
     }
 
+    if (sg_app_state == APP_STATE_SCANNING)
+    {
+        if ((sg_input.temperature_c >= TEMP_THRESHOLD_WARNING_C) ||
+            (sg_input.radar_present == RADAR_PRESENCE) ||
+            (sg_input.sound_detected != 0U))
+        {
+            return SYS_STATE_WARNING;
+        }
+    }
+
     return SYS_STATE_SAFE;
+}
+
+static uint8_t APP_IsSoundIndicatorActive(void)
+{
+    if (sg_last_sound_tick == 0U)
+    {
+        return 0U;
+    }
+
+    return ((SysTimer_GetTick() - sg_last_sound_tick) < APP_SOUND_INDICATOR_HOLD_MS) ? 1U : 0U;
 }
 
 static void APP_Buzzer_Init(void)
@@ -488,6 +532,29 @@ static void APP_Buzzer_Write(uint8_t on)
     else
     {
         BUZZER_PORT->ODR &= ~(1U << BUZZER_PIN);
+    }
+}
+
+static void APP_SoundLed_Init(void)
+{
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+    SOUND_LED_PORT->MODER &= ~(3U << (SOUND_LED_PIN * 2U));
+    SOUND_LED_PORT->MODER |=  (1U << (SOUND_LED_PIN * 2U));
+    SOUND_LED_PORT->OTYPER &= ~(1U << SOUND_LED_PIN);
+    SOUND_LED_PORT->PUPDR &= ~(3U << (SOUND_LED_PIN * 2U));
+    SOUND_LED_PORT->OSPEEDR &= ~(3U << (SOUND_LED_PIN * 2U));
+    SOUND_LED_PORT->ODR &= ~(1U << SOUND_LED_PIN);
+}
+
+static void APP_SoundLed_Write(uint8_t on)
+{
+    if (on != 0U)
+    {
+        SOUND_LED_PORT->ODR |= (1U << SOUND_LED_PIN);
+    }
+    else
+    {
+        SOUND_LED_PORT->ODR &= ~(1U << SOUND_LED_PIN);
     }
 }
 
