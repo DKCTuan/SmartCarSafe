@@ -1,106 +1,70 @@
 /**
  * @file    main.c
  * @author  Mem 2
- * @brief   Test RCWL-0516 Radar sensor with LED (PA5) and SysTick.
- * @date    2026
+ * @brief   Chương trình test độc lập module Radar RCWL-0516 (Bare-metal)
  */
 
-#include "stm32f4xx.h"          /* thanh ghi */
-#include "radar_exti.h"         /* driver radar */
-#include "sys_timer.h"          /* system tick 1ms */
+#include "stm32f4xx.h"
+#include "sys_timer.h"
+#include "radar_exti.h"
 
 /* ------------------------------------------------------------------ */
-/* Định nghĩa LED test (PA5 - LED xanh trên Nucleo)                    */
+/* Định nghĩa phần cứng cho LED test (LD2 trên mạch Nucleo F411RE)     */
 /* ------------------------------------------------------------------ */
-#define LED_GPIO_PORT      GPIOA
-#define LED_PIN            5U
-#define LED_GPIO_CLK_BIT   0U      /* bit 0 trong RCC->AHB1ENR cho GPIOA */
+#define LED_PORT GPIOA
+#define LED_PIN  5U
 
-/* ------------------------------------------------------------------ */
-/* Hàm khởi tạo LED                                                    */
-/* ------------------------------------------------------------------ */
-static void LED_Init(void)
-{
-    /* Bật clock cho GPIOA */
-    RCC->AHB1ENR |= (1U << LED_GPIO_CLK_BIT);
+/**
+ * @brief Khởi tạo chân PA5 ở chế độ Output Push-Pull để điều khiển LED
+ */
+void LED_Init(void) {
+    /* 1. Bật xung nhịp cho cổng GPIOA */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
-    /* Cấu hình PA5 là output push-pull, tốc độ cao, không kéo */
-    LED_GPIO_PORT->MODER   &= ~(3U << (LED_PIN * 2));
-    LED_GPIO_PORT->MODER   |=  (1U << (LED_PIN * 2));   /* 01 = output */
+    /* 2. Cấu hình chân PA5 là Output (MODER = 01) */
+    LED_PORT->MODER &= ~(3U << (LED_PIN * 2));
+    LED_PORT->MODER |=  (1U << (LED_PIN * 2));
 
-    LED_GPIO_PORT->OTYPER  &= ~(1U << LED_PIN);         /* push-pull */
-    LED_GPIO_PORT->OSPEEDR &= ~(3U << (LED_PIN * 2));
-    LED_GPIO_PORT->OSPEEDR |=  (2U << (LED_PIN * 2));   /* high speed */
-    LED_GPIO_PORT->PUPDR   &= ~(3U << (LED_PIN * 2));   /* no pull */
+    /* 3. Tắt LED lúc mới khởi động */
+    LED_PORT->ODR &= ~(1U << LED_PIN);
 }
 
-static inline void LED_Set(uint8_t state)
-{
-    if (state)
-        LED_GPIO_PORT->ODR |= (1U << LED_PIN);
-    else
-        LED_GPIO_PORT->ODR &= ~(1U << LED_PIN);
-}
-
-/* ------------------------------------------------------------------ */
-/* Delay thô (không chính xác, chỉ để giảm tần suất kiểm tra)          */
-/* ------------------------------------------------------------------ */
-static void delay_ms(uint32_t ms)
-{
-    for (uint32_t i = 0; i < ms * 10000; i++) {
-        __NOP();
+/**
+ * @brief Bật hoặc tắt LED
+ * @param state: 1 để bật LED, 0 để tắt LED
+ */
+void LED_Write(uint8_t state) {
+    if (state == 1U) {
+        LED_PORT->ODR |= (1U << LED_PIN);
+    } else {
+        LED_PORT->ODR &= ~(1U << LED_PIN);
     }
 }
 
 /* ------------------------------------------------------------------ */
-/* Chương trình chính                                                  */
+/* Chương trình chính                                                 */
 /* ------------------------------------------------------------------ */
-int main(void)
-{
-    /* 1. Xác định nguồn clock và tần số CPU thực tế                     */
-    uint8_t clock_source = (RCC->CFGR >> 2) & 0x03;
-    uint32_t cpu_freq;
+int main(void) {
+    /* * Bước 1: Khởi tạo SysTick Timer
+     * Vi điều khiển STM32F411RE mặc định chạy xung nội HSI ở tần số 16MHz.
+     * Cấp giá trị 16000000 để tạo ra ngắt SysTick chuẩn xác 1ms.
+     */
+    SysTimer_Init(16000000U);
 
-    switch(clock_source) {
-        case 0: /* HSI */
-            cpu_freq = 16000000;
-            break;
-        case 1: /* HSE (giả định thạch anh 8MHz) */
-            cpu_freq = 8000000;
-            break;
-        case 2: /* PLL – ưu tiên dùng SystemCoreClock nếu có */
-#ifdef SystemCoreClock
-            cpu_freq = SystemCoreClock;
-#else
-            /* Nếu không có, cần tính từ RCC->PLLCFGR, nhưng tạm mặc định 84MHz */
-            cpu_freq = 84000000;
-#endif
-            break;
-        default:
-            cpu_freq = 16000000;
-            break;
-    }
-
-    /* 2. Khởi tạo LED (để có thể quan sát trạng thái ngay) */
+    /* Bước 2: Khởi tạo các ngoại vi */
     LED_Init();
-
-    /* 3. Khởi tạo SysTick với tần số đã xác định (đảm bảo tick 1ms) */
-    SysTimer_Init(cpu_freq);
-
-    /* 4. Khởi tạo radar (cấu hình PA1, EXTI1, NVIC) */
     Radar_EXTI_Init();
 
-    /* 5. Vòng lặp chính */
-    while (1)
-    {
-        /* Kiểm tra trạng thái hiện diện (có bộ lọc và hold timer) */
-        if (Radar_Is_Detected() == RADAR_PRESENCE) {
-            LED_Set(1);   /* Bật LED khi phát hiện chuyển động */
-        } else {
-            LED_Set(0);   /* Tắt LED khi không có chuyển động */
-        }
+    /* Bước 3: Vòng lặp vô tận (Super-loop) */
+    while (1) {
+        /* Liên tục gọi hàm kiểm tra Radar (đã bao gồm lọc nhiễu và đếm thời gian) */
+        uint8_t radar_status = Radar_Is_Detected();
 
-        /* Delay nhỏ để giảm tải CPU, tần suất kiểm tra khoảng 100Hz */
-        delay_ms(10);
+        /* Điều khiển LED dựa trên trạng thái của Radar */
+        if (radar_status == RADAR_PRESENCE) {
+            LED_Write(1U);  /* Sáng đèn LED LD2 trên board */
+        } else {
+            LED_Write(0U);  /* Tắt đèn LED LD2 */
+        }
     }
 }
