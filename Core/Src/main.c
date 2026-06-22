@@ -67,11 +67,11 @@ typedef struct
 #define APP_ARMING_TIME_MS          3000U
 #define APP_SENSOR_PERIOD_MS        20U
 #define APP_TEMP_PERIOD_MS          1000U
-#define APP_LCD_PERIOD_MS           500U
+#define APP_LCD_PERIOD_MS           2000U
 #define APP_ALARM_RECHECK_MS        10000U
 
-#define TEMP_THRESHOLD_WARNING_C    35.0f
-#define TEMP_THRESHOLD_DANGER_C     40.0f
+#define TEMP_THRESHOLD_WARNING_C    25.0f
+#define TEMP_THRESHOLD_DANGER_C     30.0f
 #define SOUND_THRESHOLD_ADC         2500U
 
 /* Gia tri danh dau kenh chap hanh khong su dung.
@@ -167,10 +167,12 @@ static void APP_Buzzer_Init(void);
 static void APP_Buzzer_Write(uint8_t on);
 static void APP_Led_Write(uint8_t on);
 static void APP_Led_TogglePattern(uint32_t period_ms);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 static void APP_Init(void)
 {
     /* Bang cau hinh phan cung duoc nap vao cac driver rieng.
@@ -265,9 +267,20 @@ static void APP_Process(void)
 
 static void APP_ReadFastInputs(void)
 {
-    sg_input.acc_on = Car_Get_System_Status(CAR_ACC_SIGNAL);
-    sg_input.door_open = Car_Get_System_Status(CAR_DOOR_SIGNAL);
-    sg_input.locked = Car_Get_System_Status(CAR_LOCK_SIGNAL);
+    /* TẠM THỜI: Đọc trực tiếp nút bấm B1 (PC13) có sẵn trên kit Nucleo */
+    uint8_t b1_status = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
+
+    /* ÉP LOGIC:
+     * - Khi NHẤN GIỮ nút B1 (b1_status == 0): Coi như xe ĐÃ KHÓA (locked = 1U)
+     * - Khi THẢ nút B1 (b1_status == 1): Coi như xe MỞ KHÓA (locked = 0U)
+     */
+    sg_input.locked = (b1_status == GPIO_PIN_RESET) ? 1U : 0U;
+
+    /* Các tín hiệu giả lập khác ép bằng 0 để không bị vướng điều kiện */
+    sg_input.acc_on = 0U;     // Giả lập xe luôn tắt máy
+    sg_input.door_open = 0U;   // Giả lập cửa luôn đóng
+
+    /* Đọc dữ liệu từ các cảm biến (Giữ nguyên) */
     sg_input.radar_present = Radar_Is_Detected();
     sg_input.sound_detected = Sound_IsDetected();
 }
@@ -517,8 +530,10 @@ int main(void)
 
   /* USER CODE END Init */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+  /* Giu clock mac dinh HSI 16 MHz de khop voi driver hw_i2c.c.
+   * Driver I2C hien tai cau hinh CR2/CCR/TRISE co dinh cho APB1 = 16 MHz.
+   */
+  /* SystemClock_Config(); */
 
   /* USER CODE BEGIN SysInit */
 
