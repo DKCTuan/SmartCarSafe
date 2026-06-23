@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f4xx_it.h"
+#include "sys_timer.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
@@ -185,9 +186,10 @@ void SysTick_Handler(void)
   /* USER CODE BEGIN SysTick_IRQn 0 */
 
   /* USER CODE END SysTick_IRQn 0 */
-  HAL_IncTick();
-  /* USER CODE BEGIN SysTick_IRQn 1 */
+  HAL_IncTick(); /* Của hệ thống ST sinh ra, kệ nó */
 
+  /* USER CODE BEGIN SysTick_IRQn 1 */
+  SysTimer_Increment(); /* Bánh răng thời gian của nhóm đặt ở đây! */
   /* USER CODE END SysTick_IRQn 1 */
 }
 
