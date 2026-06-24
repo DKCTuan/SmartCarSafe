@@ -22,6 +22,8 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "radar_exti.h" /*mem2*/
+#include "sys_timer.h"  /*mem2*/
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,7 +43,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -183,7 +184,7 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-
+	SysTimer_Increment(); /* Mem 2: increment system tick every 1ms */
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
@@ -199,5 +200,21 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /* USER CODE BEGIN 1 */
-
+/*Mem2begin*/
+void EXTI1_IRQHandler(void)
+{
+    /* USER CODE BEGIN EXTI1_IRQn 0 */
+	if (EXTI->PR & (1U << RADAR_PIN))
+	    {
+	        /* * Clear pending flag BEFORE calling callback.
+	         * STM32 clears PR register by writing 1 to the bit (not 0).
+	         * If cleared after callback, a re-trigger during callback
+	         * execution would be lost.
+	         */
+	        EXTI->PR = (1U << RADAR_PIN);
+	        Radar_EXTI_Callback();
+    }
+    /* USER CODE END EXTI1_IRQn 0 */
+}
+/*Mem2end*/
 /* USER CODE END 1 */
