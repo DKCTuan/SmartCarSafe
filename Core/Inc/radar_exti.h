@@ -16,9 +16,14 @@
 /* */
 /* !!! WARNING: Nếu thay đổi chân 'RADAR_PIN', phải: 				  										  */
 /* 1. Đổi tên hàm phục vụ ngắt (ISR) trong file 'stm32f4xx_it.c' sao cho khớp với bảng Vector ngắt của STM32: */
-/* - Pins 0 to 4:   EXTI0_IRQHandler -> EXTI4_IRQHandler         											  */
-/* - Pins 5 to 9:   EXTI9_5_IRQHandler                           											  */
-/* - Pins 10 to 15: EXTI15_10_IRQHandler                         											  */
+/* Tên ISR trong stm32f4xx_it.c theo bảng sau:                   */
+/*     Pin 0       -> EXTI0_IRQHandler                                */
+/*     Pin 1       -> EXTI1_IRQHandler        <- Đang dùng            */
+/*     Pin 2       -> EXTI2_IRQHandler                                */
+/*     Pin 3       -> EXTI3_IRQHandler                                */
+/*     Pin 4       -> EXTI4_IRQHandler                                */
+/*     Pin 5-9     -> EXTI9_5_IRQHandler                              */
+/*     Pin 10-15   -> EXTI15_10_IRQHandler                       											  */
 /* 2. Cập nhật lại macro 'RADAR_EXTI_IRQn' bên dưới tương ứng với nhóm chân.           						  */
 /* 3. Cập nhật lại 'RADAR_EXTI_PORT_SRC' nếu chuyển sang sử dụng port khác.    								  */
 /* ------------------------------------------------------------------ */
