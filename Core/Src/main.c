@@ -90,6 +90,14 @@ typedef struct
 #define CAR_LOCK_PORT               GPIOC
 #define CAR_LOCK_PIN                2U
 
+/* Các chân LED báo trạng thái nút bấm (Port C) */
+#define LED_ACC_PORT        		GPIOC
+#define LED_ACC_PIN         		3U
+#define LED_DOOR_PORT       		GPIOC
+#define LED_DOOR_PIN        		4U
+#define LED_LOCK_PORT       		GPIOC
+#define LED_LOCK_PIN        		5U
+
 /* Cảm biến âm thanh KY-037 */
 #define SOUND_PORT                  GPIOA
 #define SOUND_PIN                   0U
@@ -307,7 +315,10 @@ static void APP_Init(void)
         .ain2 = {FAN_AIN2_PORT, FAN_AIN2_PIN},
         .stby = {FAN_STBY_PORT, FAN_STBY_PIN},
         .pwma = {FAN_PWM_PORT, FAN_PWM_PIN, TIM3_AF},
-        .servo = {SERVO_PWM_PORT, SERVO_PWM_PIN, TIM3_AF}
+        .servo = {SERVO_PWM_PORT, SERVO_PWM_PIN, TIM3_AF},
+        .led_acc  = {LED_ACC_PORT, LED_ACC_PIN},
+        .led_door = {LED_DOOR_PORT, LED_DOOR_PIN},
+        .led_lock = {LED_LOCK_PORT, LED_LOCK_PIN}
     };
 
     /* Khởi tạo bộ đều khiển thời gian hệ thống và các thiết bị đầu ra */
@@ -401,6 +412,9 @@ static void APP_ReadFastInputs(void)
     {
         sg_last_sound_tick = SysTimer_GetTick();
     }
+
+    /* Cập nhật LED */
+    Actuator_Set_StatusLED(sg_input.acc_on, door_requested, sg_input.locked);
 }
 
 /*
