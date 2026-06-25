@@ -9,7 +9,7 @@
 /* ------------------------------------------------------------------ */
 /* Timing Constants                                                    */
 /* ------------------------------------------------------------------ */
-#define RADAR_FILTER_MS   60U     /**< Signal must stay HIGH >= 60ms to confirm presence */
+#define RADAR_FILTER_MS   20U     /**< Signal must stay HIGH >= 60ms to confirm presence */
 #define RADAR_HOLD_MS     3000U   /**< Hold PRESENCE for 3s after pin drops LOW          */
 
 /* ------------------------------------------------------------------ */

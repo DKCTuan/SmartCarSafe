@@ -6,8 +6,8 @@ static Car_Pin_Config_t signal_pins[CAR_SIGNAL_MAX];
 
 /* Biến phục vụ thuật toán debounce
  * Chỉ số mảng tương ứng với giá trị của enum Car_Signal_Type_t */
-static uint8_t  last_pin_states[CAR_SIGNAL_MAX]   = {1, 1, 1}; /* Mặc định mức cao (do pull-up) */
-static uint8_t  stable_pin_states[CAR_SIGNAL_MAX] = {1, 1, 1}; /* Trạng thái đã lọc nhiễu */
+static uint8_t  last_pin_states[CAR_SIGNAL_MAX]    = {1, 1, 1}; /* Mặc định mức cao (do pull-up) */
+static uint8_t  stable_pin_states[CAR_SIGNAL_MAX]  = {1, 1, 1}; /* Trạng thái đã lọc nhiễu */
 static uint32_t last_debounce_time[CAR_SIGNAL_MAX] = {0, 0, 0}; /* Mốc thời gian SysTick */
 
 /* Mảng xử lý tính năng nhấn - nhả */
