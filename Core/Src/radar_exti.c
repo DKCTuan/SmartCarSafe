@@ -61,76 +61,85 @@ void Radar_EXTI_Init(void)
 	/* Write the actual port source code (0=PA, 1=PB, 2=PC) */
 	SYSCFG->EXTICR[RADAR_PIN / 4] |=  (RADAR_EXTI_PORT_SRC << ((RADAR_PIN % 4) * 4));
 
-	/* Step 4: Configure EXTI line */
-	EXTI->IMR  |=  (1U << RADAR_PIN);  /* Unmask interrupt line       */
-	EXTI->RTSR |=  (1U << RADAR_PIN);  /* Trigger on Rising edge only */
-	EXTI->FTSR &= ~(1U << RADAR_PIN);  /* Disable Falling edge        */
-	EXTI->PR    =  (1U << RADAR_PIN);  /* Clear any stale pending flag */
+	/* Bước 4: Cấu hình thanh ghi của đường ngắt EXTI */
+	EXTI->IMR  |=  (1U << RADAR_PIN);  /* Mở mặt nạ ngắt (Unmask) cho phép đường ngắt này hoạt động */
+	EXTI->RTSR |=  (1U << RADAR_PIN);  /* Cấu hình kích hoạt ngắt khi có sườn lên (Rising edge - từ 0V lên 3.3V) */
+	EXTI->FTSR &= ~(1U << RADAR_PIN);  /* Vô hiệu hóa kích hoạt ngắt khi có sườn xuống (Falling edge) */
+	EXTI->PR    =  (1U << RADAR_PIN);  /* Xóa các cờ ngắt cũ có thể còn tồn đọng trước khi hệ thống chạy */
 
-	/* Step 5: Configure NVIC */
-	NVIC_SetPriority(RADAR_EXTI_IRQn, 2);
-	NVIC_EnableIRQ(RADAR_EXTI_IRQn);
+	/* Bước 5: Cấu hình Bộ Điều Khiển Vectơ Ngắt Đa Chiều Lồng Nhau (NVIC) */
+	NVIC_SetPriority(RADAR_EXTI_IRQn, 2); /* Đặt mức độ ưu tiên ngắt là 2 (Mức độ vừa phải) */
+	NVIC_EnableIRQ(RADAR_EXTI_IRQn);	/* Cho phép kênh ngắt này được kích hoạt trên lõi vi xử lý ARM */
 }
 
 /* ------------------------------------------------------------------ */
-/* Public: ISR Callback                                                */
+/* Public: Hàm Xử Lý Gọi Ngược Từ Ngắt (ISR Callback)                                               */
 /* ------------------------------------------------------------------ */
 void Radar_EXTI_Callback(void)
 {
+	/* Ghi nhận cờ báo hiệu thô là đã có sự kiện kích hoạt sườn lên từ Radar */
     s_raw_trigger = RADAR_PRESENCE;
 }
 
 /* ------------------------------------------------------------------ */
-/* Public: Time-Filtered Presence Detection                            */
+/*Public: Thuật Toán Xác Nhận Chuyển Động (Lọc Nhiễu Thời Gian)                        */
 /* ------------------------------------------------------------------ */
 uint8_t Radar_Is_Detected(void)
 {
+	/* Đọc trạng thái logic vật lý thực tế của chân GPIO tại thời điểm hiện tại */
     uint8_t pin_high = (RADAR_GPIO_PORT->IDR & (1U << RADAR_PIN)) ? 1U : 0U;
 
-    /* CASE 1: Interrupt fired AND pin is physically HIGH */
+    /* TRƯỜNG HỢP 1: Cờ ngắt phần cứng đã được kích hoạt VÀ chân tín hiệu đang thực sự ở mức CAO */
     if ((s_raw_trigger == RADAR_PRESENCE) && (pin_high == 1U))
     {
-        s_hold_active = 0U;  /* Cancel hold timer if motion resumes */
+        s_hold_active = 0U;  /* Hủy bỏ bộ đếm thời gian giữ (hold timer) nếu có chuyển động quay trở lại */
 
+        /* Nếu bộ lọc chưa chạy, bắt đầu đếm thời gian */
         if (s_filter_active == 0U) {
             s_filter_start  = SysTimer_GetTick();
             s_filter_active = 1U;
         }
 
+        /* Nếu tín hiệu duy trì mức CAO đủ lâu (vượt qua ngưỡng RADAR_FILTER_MS) -> Xác nhận CÓ NGƯỜI */
         if ((SysTimer_GetTick() - s_filter_start) >= RADAR_FILTER_MS) {
             s_validated_state = RADAR_PRESENCE;
         }
     }
-    /* CASE 2: Pin LOW or no raw trigger */
+    /* TRƯỜNG HỢP 2: Chân tín hiệu ở mức THẤP hoặc chưa từng có cờ ngắt nào xảy ra */
     else
     {
-        s_filter_active = 0U;
-        s_raw_trigger   = RADAR_ABSENCE;
+        s_filter_active = 0U; /* Xóa bộ đếm lọc nhiễu */
+        s_raw_trigger   = RADAR_ABSENCE; /* Reset cờ ngắt thô */
 
         /*
-         * HOLD TIMER: RCWL-0516 auto-pulls OUT pin LOW after ~2-3s
-         * even if a person remains present. Hold PRESENCE state for
-         * RADAR_HOLD_MS before declaring absence.
+         * BỘ ĐẾM GIỮ TRẠNG THÁI (HOLD TIMER):
+         * Đặc tính của cảm biến RCWL-0516 là tự động kéo chân OUT xuống mức THẤP
+         * sau khoảng 2-3 giây kể từ lần phát hiện cuối, ngay cả khi người vẫn đứng im trong vùng quét.
+         * Do đó, phần mềm cần duy trì trạng thái CÓ NGƯỜI thêm một khoảng thời gian (RADAR_HOLD_MS)
+         * trước khi chính thức kết luận là xe đã trống.
          */
         if (s_validated_state == RADAR_PRESENCE) {
+        	/* Bắt đầu kích hoạt bộ đếm thời gian giữ */
             if (s_hold_active == 0U) {
                 s_hold_start  = SysTimer_GetTick();
                 s_hold_active = 1U;
             }
+            /* Nếu đã vượt quá thời gian giữ mà không có chuyển động mới -> Xác nhận KHÔNG CÓ NGƯỜI */
             if ((SysTimer_GetTick() - s_hold_start) >= RADAR_HOLD_MS) {
                 s_validated_state = RADAR_ABSENCE;
                 s_hold_active     = 0U;
             }
         }
     }
-    return s_validated_state;
+    return s_validated_state; /* Trả về trạng thái đã được xử lý tinh gọn cho State Machine */
 }
 
 /* ------------------------------------------------------------------ */
-/* Public: Full State Reset                                            */
+/* Public: Hàm Xóa/Khôi Phục Toàn Bộ Trạng Thái Hệ Thống                                       */
 /* ------------------------------------------------------------------ */
 void Radar_ClearPresence(void)
 {
+	/* Đặt lại toàn bộ các biến quản lý trạng thái và bộ đếm về mặc định */
     s_raw_trigger     = RADAR_ABSENCE;
     s_validated_state = RADAR_ABSENCE;
     s_filter_active   = 0U;
